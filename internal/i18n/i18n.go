@@ -88,6 +88,7 @@ type Messages struct {
 	PullDone                string
 	PullResultPrefix        string
 	FetchDone               string
+	PrunedBranchesFmt       string
 	CheckoutDoneFmt         string
 	BranchCreatedFmt        string
 	CommitDoneMsg           string

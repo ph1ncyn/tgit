@@ -30,6 +30,7 @@ var ru = Messages{
 	PullDone:                "pull выполнен",
 	PullResultPrefix:        "pull: ",
 	FetchDone:               "fetch выполнен",
+	PrunedBranchesFmt:       "удалены локальные ветки без remote: %s",
 	CheckoutDoneFmt:         "переключено на %s",
 	BranchCreatedFmt:        "создана и выбрана ветка %s",
 	CommitDoneMsg:           "коммит создан",

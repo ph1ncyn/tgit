@@ -355,9 +355,61 @@ func (r *Repo) runGitAuth(token string, args ...string) (string, error) {
 	return runGitCombined(r.Root, full...)
 }
 
-func (r *Repo) Push(token string) (string, error)  { return r.runGitAuth(token, "push") }
-func (r *Repo) Pull(token string) (string, error)  { return r.runGitAuth(token, "pull") }
-func (r *Repo) Fetch(token string) (string, error) { return r.runGitAuth(token, "fetch", "--all") }
+func (r *Repo) Push(token string) (string, error) { return r.runGitAuth(token, "push") }
+
+func (r *Repo) Pull(token string) (string, error) {
+	out, err := r.runGitAuth(token, "pull", "--prune")
+	if err != nil {
+		return out, err
+	}
+	return out + r.pruneMsg(), nil
+}
+
+func (r *Repo) Fetch(token string) (string, error) {
+	out, err := r.runGitAuth(token, "fetch", "--all", "--prune")
+	if err != nil {
+		return out, err
+	}
+	return out + r.pruneMsg(), nil
+}
+
+// pruneMsg удаляет локальные ветки, чей upstream был удалён на сервере
+// (виден как "[gone]" после --prune), и возвращает текст для статус-бара.
+// Текущую ветку и ветки с неслитыми локальными коммитами не трогает —
+// удаление всегда идёт через "git branch -d" (безопасный, не -D).
+func (r *Repo) pruneMsg() string {
+	deleted, err := r.deleteGoneBranches()
+	if err != nil || len(deleted) == 0 {
+		return ""
+	}
+	return "\n" + fmt.Sprintf(i18n.T.PrunedBranchesFmt, strings.Join(deleted, ", "))
+}
+
+// deleteGoneBranches удаляет локальные ветки, у которых был upstream, но он
+// пропал на remote (обычно потому что ветку удалили на GitHub). Требует,
+// чтобы актуальность remote-tracking ссылок уже была обновлена через
+// `fetch --prune`/`pull --prune` — сама эта функция сеть не трогает.
+func (r *Repo) deleteGoneBranches() ([]string, error) {
+	current, err := r.CurrentBranch()
+	if err != nil {
+		return nil, err
+	}
+	out, err := runGit(r.Root, "for-each-ref", "--format=%(refname:short)%09%(upstream:track)", "refs/heads")
+	if err != nil {
+		return nil, err
+	}
+	var deleted []string
+	for _, line := range splitLines(out) {
+		name, track, ok := strings.Cut(line, "\t")
+		if !ok || name == current || !strings.Contains(track, "[gone]") {
+			continue
+		}
+		if _, err := runGitCombined(r.Root, "branch", "-d", name); err == nil {
+			deleted = append(deleted, name)
+		}
+	}
+	return deleted, nil
+}
 
 // LsFiles возвращает все отслеживаемые файлы репозитория.
 func (r *Repo) LsFiles() ([]string, error) {
