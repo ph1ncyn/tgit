@@ -84,7 +84,10 @@ func (a App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return a, cmd
 
 		case stateMain:
-			if msg.String() == "g" {
+			// 'g' переключает на экран входа, но только когда на главном экране
+			// нет активного диалога с текстовым полем (коммит, фильтр веток) —
+			// иначе буква 'g' должна печататься в это поле, а не перехватываться.
+			if msg.String() == "g" && !a.main.IsModal() {
 				a.state = stateLogin
 				a.login = newLoginModel()
 				return a, a.login.Init()
@@ -108,8 +111,11 @@ func (a App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			a.login.errMsg = msg.err.Error()
 			return a, nil
 		}
-		if !wasSilentCheck {
-			_ = secret.Save(a.login.tokenValue())
+		if wasSilentCheck {
+			a.main.ghToken = a.pendingToken
+		} else {
+			a.main.ghToken = a.login.tokenValue()
+			_ = secret.Save(a.main.ghToken)
 		}
 		a.main.ghUser = msg.user
 		a.state = stateMain

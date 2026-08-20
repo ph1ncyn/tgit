@@ -6,8 +6,12 @@ package gitrepo
 
 import (
 	"bytes"
+	"encoding/base64"
 	"fmt"
+	"os"
 	"os/exec"
+	"path/filepath"
+	"strconv"
 	"strings"
 )
 
@@ -15,6 +19,25 @@ import (
 type FileStatus struct {
 	X, Y byte
 	Path string
+}
+
+// Staged сообщает, застейджен ли файл (индекс отличается от HEAD).
+func (f FileStatus) Staged() bool {
+	return f.X != ' ' && f.X != '?'
+}
+
+// Untracked сообщает, что файл вообще не отслеживается git.
+func (f FileStatus) Untracked() bool {
+	return f.X == '?' && f.Y == '?'
+}
+
+// Commit — одна запись из `git log`.
+type Commit struct {
+	Hash    string
+	Short   string
+	Author  string
+	Date    string
+	Subject string
 }
 
 // Repo — открытый git-репозиторий.
@@ -47,6 +70,34 @@ func runGit(dir string, args ...string) (string, error) {
 	return stdout.String(), nil
 }
 
+// runGitCombined возвращает stdout+stderr вместе (нужно для команд вроде
+// push/pull/fetch, которые печатают сводку в stderr даже при успехе) и не
+// прерывает выполнение при ошибке — вызывающий сам решает, что делать.
+func runGitCombined(dir string, args ...string) (string, error) {
+	cmd := exec.Command("git", args...)
+	cmd.Dir = dir
+	var buf bytes.Buffer
+	cmd.Stdout = &buf
+	cmd.Stderr = &buf
+	err := cmd.Run()
+	out := strings.TrimSpace(buf.String())
+	if err != nil {
+		if out == "" {
+			out = err.Error()
+		}
+		return "", fmt.Errorf("%s", out)
+	}
+	return out, nil
+}
+
+func splitLines(out string) []string {
+	out = strings.TrimRight(out, "\n")
+	if out == "" {
+		return nil
+	}
+	return strings.Split(out, "\n")
+}
+
 // CurrentBranch возвращает имя текущей ветки (или "HEAD" при detached HEAD).
 func (r *Repo) CurrentBranch() (string, error) {
 	out, err := runGit(r.Root, "rev-parse", "--abbrev-ref", "HEAD")
@@ -56,19 +107,42 @@ func (r *Repo) CurrentBranch() (string, error) {
 	return strings.TrimSpace(out), nil
 }
 
+// AheadBehind — насколько текущая ветка опережает/отстаёт от upstream.
+// Если upstream не настроен, возвращает (0, 0, err) — вызывающий код должен
+// просто скрыть индикатор, это не настоящая ошибка.
+func (r *Repo) AheadBehind() (ahead, behind int, err error) {
+	out, err := runGit(r.Root, "rev-list", "--left-right", "--count", "HEAD...@{upstream}")
+	if err != nil {
+		return 0, 0, err
+	}
+	parts := strings.Fields(out)
+	if len(parts) != 2 {
+		return 0, 0, fmt.Errorf("неожиданный вывод git rev-list")
+	}
+	ahead, _ = strconv.Atoi(parts[0])
+	behind, _ = strconv.Atoi(parts[1])
+	return ahead, behind, nil
+}
+
 // Branches возвращает список локальных веток.
 func (r *Repo) Branches() ([]string, error) {
 	out, err := runGit(r.Root, "branch", "--format=%(refname:short)")
 	if err != nil {
 		return nil, err
 	}
-	var branches []string
-	for _, l := range strings.Split(strings.TrimRight(out, "\n"), "\n") {
-		if strings.TrimSpace(l) != "" {
-			branches = append(branches, l)
-		}
-	}
-	return branches, nil
+	return splitLines(out), nil
+}
+
+// Checkout переключает на существующую ветку.
+func (r *Repo) Checkout(branch string) error {
+	_, err := runGitCombined(r.Root, "checkout", branch)
+	return err
+}
+
+// CreateBranch создаёт новую ветку от текущего HEAD и сразу переключается на неё.
+func (r *Repo) CreateBranch(name string) error {
+	_, err := runGitCombined(r.Root, "checkout", "-b", name)
+	return err
 }
 
 // Status возвращает список изменённых/новых файлов.
@@ -78,7 +152,7 @@ func (r *Repo) Status() ([]FileStatus, error) {
 		return nil, err
 	}
 	var files []FileStatus
-	for _, line := range strings.Split(strings.TrimRight(out, "\n"), "\n") {
+	for _, line := range splitLines(out) {
 		if len(line) < 3 {
 			continue
 		}
@@ -89,4 +163,217 @@ func (r *Repo) Status() ([]FileStatus, error) {
 		})
 	}
 	return files, nil
+}
+
+// StageFile добавляет файл в индекс.
+func (r *Repo) StageFile(path string) error {
+	_, err := runGit(r.Root, "add", "--", path)
+	return err
+}
+
+// UnstageFile убирает файл из индекса, оставляя изменения в рабочем каталоге.
+func (r *Repo) UnstageFile(path string) error {
+	_, err := runGit(r.Root, "restore", "--staged", "--", path)
+	return err
+}
+
+// Commit создаёт коммит из застейдженных изменений.
+func (r *Repo) Commit(message string) error {
+	_, err := runGitCombined(r.Root, "commit", "-m", message)
+	return err
+}
+
+// Log возвращает последние limit коммитов текущей ветки.
+func (r *Repo) Log(limit int) ([]Commit, error) {
+	const sep = "\x1f"
+	format := "%H" + sep + "%h" + sep + "%an" + sep + "%ad" + sep + "%s"
+	out, err := runGit(r.Root, "log", "-n", strconv.Itoa(limit), "--date=short", "--pretty=format:"+format)
+	if err != nil {
+		if strings.Contains(err.Error(), "does not have any commits") {
+			return nil, nil
+		}
+		return nil, err
+	}
+	var commits []Commit
+	for _, line := range splitLines(out) {
+		parts := strings.Split(line, sep)
+		if len(parts) != 5 {
+			continue
+		}
+		commits = append(commits, Commit{Hash: parts[0], Short: parts[1], Author: parts[2], Date: parts[3], Subject: parts[4]})
+	}
+	return commits, nil
+}
+
+// DiffFile возвращает diff одного файла (застейдженный или рабочий, в
+// зависимости от staged). Для untracked-файлов diff пуст, поэтому вместо
+// него показываем начало содержимого файла как превью.
+func (r *Repo) DiffFile(path string, staged bool) (string, error) {
+	args := []string{"diff"}
+	if staged {
+		args = append(args, "--cached")
+	}
+	args = append(args, "--", path)
+	out, err := runGit(r.Root, args...)
+	if err != nil {
+		return "", err
+	}
+	if strings.TrimSpace(out) != "" {
+		return out, nil
+	}
+	return r.untrackedPreview(path)
+}
+
+func (r *Repo) untrackedPreview(path string) (string, error) {
+	const maxBytes = 4000
+	f, err := os.Open(filepath.Join(r.Root, path))
+	if err != nil {
+		return "", nil // например, файл удалён — просто нет превью
+	}
+	defer f.Close()
+
+	buf := make([]byte, maxBytes)
+	n, _ := f.Read(buf)
+	buf = buf[:n]
+
+	for _, b := range buf {
+		if b == 0 {
+			return "(бинарный файл, предпросмотр недоступен)", nil
+		}
+	}
+	suffix := ""
+	if n == maxBytes {
+		suffix = "\n… (обрезано)"
+	}
+	return string(buf) + suffix, nil
+}
+
+// DiffCommit возвращает сообщение коммита и его diff.
+func (r *Repo) DiffCommit(hash string) (string, error) {
+	return runGit(r.Root, "show", hash)
+}
+
+// Stash — одна запись `git stash list`.
+type Stash struct {
+	Ref     string // "stash@{0}"
+	Subject string
+}
+
+// StashList возвращает список стэшей с их сообщениями, от самого свежего.
+func (r *Repo) StashList() ([]Stash, error) {
+	const sep = "\x1f"
+	out, err := runGit(r.Root, "stash", "list", "--pretty=format:%gd"+sep+"%s")
+	if err != nil {
+		return nil, err
+	}
+	var stashes []Stash
+	for _, line := range splitLines(out) {
+		parts := strings.SplitN(line, sep, 2)
+		if len(parts) != 2 {
+			continue
+		}
+		stashes = append(stashes, Stash{Ref: parts[0], Subject: parts[1]})
+	}
+	return stashes, nil
+}
+
+// StashStat — краткая сводка изменённых файлов в стэше (без самого патча).
+func (r *Repo) StashStat(ref string) (string, error) {
+	return runGit(r.Root, "stash", "show", "--stat", ref)
+}
+
+// StashPush сохраняет незакоммиченные изменения в новый стэш.
+func (r *Repo) StashPush() (string, error) {
+	return runGitCombined(r.Root, "stash", "push")
+}
+
+// StashPop возвращает изменения из стэша в рабочий каталог и удаляет запись.
+// Пустой ref означает "последний стэш" (поведение `git stash pop` по умолчанию).
+func (r *Repo) StashPop(ref string) (string, error) {
+	args := []string{"stash", "pop"}
+	if ref != "" {
+		args = append(args, ref)
+	}
+	return runGitCombined(r.Root, args...)
+}
+
+// StashApply возвращает изменения из стэша в рабочий каталог, но оставляет
+// запись в стэше (в отличие от StashPop).
+func (r *Repo) StashApply(ref string) (string, error) {
+	args := []string{"stash", "apply"}
+	if ref != "" {
+		args = append(args, ref)
+	}
+	return runGitCombined(r.Root, args...)
+}
+
+// StashDrop безвозвратно удаляет запись стэша, не применяя её.
+func (r *Repo) StashDrop(ref string) (string, error) {
+	args := []string{"stash", "drop"}
+	if ref != "" {
+		args = append(args, ref)
+	}
+	return runGitCombined(r.Root, args...)
+}
+
+func (r *Repo) remoteIsGitHubHTTPS() bool {
+	out, err := runGit(r.Root, "remote", "get-url", "origin")
+	if err != nil {
+		return false
+	}
+	url := strings.TrimSpace(out)
+	return strings.HasPrefix(url, "https://github.com/") || strings.HasPrefix(url, "https://www.github.com/")
+}
+
+// runGitAuth выполняет git-команду, подставляя GitHub PAT как заголовок
+// авторизации для HTTPS-запросов к github.com — так push/pull/fetch работают
+// сразу после входа в tgit, без отдельной настройки git credential helper.
+// Для остальных remote (SSH, другие хосты) token игнорируется.
+func (r *Repo) runGitAuth(token string, args ...string) (string, error) {
+	full := args
+	if token != "" && r.remoteIsGitHubHTTPS() {
+		header := "http.extraHeader=Authorization: Basic " +
+			base64.StdEncoding.EncodeToString([]byte("x-access-token:"+token))
+		full = append([]string{"-c", header}, args...)
+	}
+	return runGitCombined(r.Root, full...)
+}
+
+func (r *Repo) Push(token string) (string, error)  { return r.runGitAuth(token, "push") }
+func (r *Repo) Pull(token string) (string, error)  { return r.runGitAuth(token, "pull") }
+func (r *Repo) Fetch(token string) (string, error) { return r.runGitAuth(token, "fetch", "--all") }
+
+// LsFiles возвращает все отслеживаемые файлы репозитория.
+func (r *Repo) LsFiles() ([]string, error) {
+	out, err := runGit(r.Root, "ls-files")
+	if err != nil {
+		return nil, err
+	}
+	return splitLines(out), nil
+}
+
+// LsFilesOthers возвращает файлы, которые git видит, но не отслеживает, и
+// которые не подпадают под существующие правила .gitignore/exclude.
+func (r *Repo) LsFilesOthers() ([]string, error) {
+	out, err := runGit(r.Root, "ls-files", "--others", "--exclude-standard")
+	if err != nil {
+		return nil, err
+	}
+	return splitLines(out), nil
+}
+
+// LsFilesOthersDirs — то же самое, но полностью неотслеживаемые каталоги
+// возвращаются целиком (с завершающим "/"), а не файл за файлом.
+func (r *Repo) LsFilesOthersDirs() ([]string, error) {
+	out, err := runGit(r.Root, "ls-files", "--others", "--exclude-standard", "--directory")
+	if err != nil {
+		return nil, err
+	}
+	return splitLines(out), nil
+}
+
+// Untrack снимает файл с отслеживания, не трогая его на диске (git rm --cached).
+func (r *Repo) Untrack(path string) error {
+	_, err := runGit(r.Root, "rm", "--cached", "--quiet", "--", path)
+	return err
 }
