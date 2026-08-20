@@ -7,8 +7,7 @@
 #   ./install.sh --system        # установить в /usr/local/bin (нужен sudo)
 #   ./install.sh --prefix=DIR    # установить в произвольный каталог
 #
-# Поддерживаются Linux и macOS. Для Windows см. раздел README про `make cross`
-# или соберите вручную: go build -o tgit.exe .
+# Поддерживаются Linux и macOS. Для Windows используйте install.ps1 (PowerShell).
 
 set -euo pipefail
 
@@ -57,7 +56,7 @@ case "$(uname -s)" in
 Linux*) OS=linux ;;
 Darwin*) OS=darwin ;;
 MINGW* | MSYS* | CYGWIN*)
-	die "Обнаружена Windows-среда. Собери вручную: go build -o tgit.exe . (см. README.md)"
+	die "Обнаружена Windows-среда. Используй install.ps1 (PowerShell): .\\install.ps1 -AddToPath"
 	;;
 *)
 	die "Неизвестная ОС: $(uname -s). Поддержаны Linux и macOS."

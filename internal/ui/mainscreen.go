@@ -222,6 +222,9 @@ func (m mainModel) Update(msg tea.Msg) (mainModel, tea.Cmd) {
 
 	case tea.KeyMsg:
 		return m.handleKey(msg)
+
+	case tea.MouseMsg:
+		return m.handleMouse(msg)
 	}
 	return m, nil
 }
@@ -723,39 +726,14 @@ func (m mainModel) View() string {
 }
 
 func (m mainModel) viewNormal() string {
-	width := m.width
-	if width <= 0 {
-		width = 100
-	}
-	height := m.height
-	if height <= 0 {
-		height = 32
-	}
+	layout := computeNormalLayout(m.width, m.height, m.err != "")
 
 	top := m.renderTopBar()
 
-	bodyHeight := height - 9
-	if bodyHeight < 8 {
-		bodyHeight = 8
-	}
-
-	leftW := 26
-	rightW := (width - leftW) * 4 / 10
-	if rightW < 24 {
-		rightW = 24
-	}
-	midW := width - leftW - rightW - 6
-	if midW < 24 {
-		midW = 24
-	}
-
-	topHalf := bodyHeight / 2
-	botHalf := bodyHeight - topHalf
-
-	branchesPanel := m.renderBranchesPanel(leftW, bodyHeight)
-	filesPanel := m.renderFilesPanel(midW, topHalf)
-	logPanel := m.renderLogPanel(midW, botHalf)
-	diffPanel := m.renderDiffPanel(rightW, bodyHeight)
+	branchesPanel := m.renderBranchesPanel(layout.branches.contentW, layout.branches.contentH)
+	filesPanel := m.renderFilesPanel(layout.files.contentW, layout.files.contentH)
+	logPanel := m.renderLogPanel(layout.log.contentW, layout.log.contentH)
+	diffPanel := m.renderDiffPanel(layout.diff.contentW, layout.diff.contentH)
 
 	middle := lipgloss.JoinVertical(lipgloss.Left, filesPanel, logPanel)
 	body := lipgloss.JoinHorizontal(lipgloss.Top, branchesPanel, middle, diffPanel)
@@ -790,8 +768,8 @@ func (m mainModel) renderTopBar() string {
 }
 
 func (m mainModel) renderBranchesPanel(w, h int) string {
-	maxRows := maxInt(h-3, 1)
-	innerW := maxInt(w-4, 1)
+	maxRows := maxInt(h-1, 1) // h — content-высота (без рамки); строка 0 — заголовок, остальные h-1 — элементы
+	innerW := maxInt(w-2, 1)  // w — content-ширина; 1 колонка padding с каждой стороны
 	var lines []string
 	if len(m.branches) == 0 {
 		lines = append(lines, helpStyle.Render("нет данных"))
@@ -816,8 +794,8 @@ func (m mainModel) renderBranchesPanel(w, h int) string {
 }
 
 func (m mainModel) renderFilesPanel(w, h int) string {
-	maxRows := maxInt(h-3, 1)
-	innerW := maxInt(w-4, 1)
+	maxRows := maxInt(h-1, 1) // h — content-высота (без рамки); строка 0 — заголовок, остальные h-1 — элементы
+	innerW := maxInt(w-2, 1)  // w — content-ширина; 1 колонка padding с каждой стороны
 	var lines []string
 	if len(m.files) == 0 {
 		lines = append(lines, okStyle.Render("чисто"))
@@ -853,8 +831,8 @@ func fileLineStyle(f gitrepo.FileStatus) lipgloss.Style {
 }
 
 func (m mainModel) renderLogPanel(w, h int) string {
-	maxRows := maxInt(h-3, 1)
-	innerW := maxInt(w-4, 1)
+	maxRows := maxInt(h-1, 1) // h — content-высота (без рамки); строка 0 — заголовок, остальные h-1 — элементы
+	innerW := maxInt(w-2, 1)  // w — content-ширина; 1 колонка padding с каждой стороны
 	var lines []string
 	if len(m.commits) == 0 {
 		lines = append(lines, helpStyle.Render("нет коммитов"))
@@ -875,8 +853,8 @@ func (m mainModel) renderLogPanel(w, h int) string {
 }
 
 func (m mainModel) renderDiffPanel(w, h int) string {
-	maxRows := maxInt(h-3, 1)
-	innerW := maxInt(w-4, 1)
+	maxRows := maxInt(h-1, 1) // h — content-высота (без рамки); строка 0 — заголовок, остальные h-1 — элементы
+	innerW := maxInt(w-2, 1)  // w — content-ширина; 1 колонка padding с каждой стороны
 	content := m.diff
 	if content == "" {
 		content = helpStyle.Render("выберите файл или коммит")
@@ -911,11 +889,12 @@ func styleDiffLine(l string) string {
 }
 
 func (m mainModel) renderToolbar() string {
-	buttons := []string{
-		"[c] Commit", "[p] Push", "[P] Pull", "[f] Fetch",
-		"[b] Branch", "[s] Stash", "[d] Doctor",
+	buttons := toolbarButtons()
+	labels := make([]string, len(buttons))
+	for i, b := range buttons {
+		labels[i] = b.label
 	}
-	return helpStyle.Render(strings.Join(buttons, "   "))
+	return helpStyle.Render(strings.Join(labels, "   "))
 }
 
 func (m mainModel) renderStatusLine() string {
@@ -986,6 +965,8 @@ func (m mainModel) viewDoctorModal() string {
 	}
 
 	b.WriteString(errorStyle.Render(fmt.Sprintf("⚠ Найдено проблем: %d", len(m.doctorIssues))) + "\n\n")
+	// Каждая проблема — ровно одна строка (без вставок под курсором): так
+	// строки кликабельны мышью по фиксированному номеру, деталь курсора — ниже.
 	for i, issue := range m.doctorIssues {
 		marker := "  "
 		style := lipgloss.NewStyle()
@@ -993,9 +974,10 @@ func (m mainModel) viewDoctorModal() string {
 			marker, style = "> ", style.Bold(true)
 		}
 		b.WriteString(style.Render(marker+issue.Title) + "\n")
-		if i == m.doctorCursor {
-			b.WriteString(helpStyle.Render("    "+truncateLine(issue.Detail, 90)) + "\n")
-		}
+	}
+
+	if m.doctorCursor < len(m.doctorIssues) {
+		b.WriteString("\n" + helpStyle.Render(truncateLine(m.doctorIssues[m.doctorCursor].Detail, 90)) + "\n")
 	}
 
 	b.WriteString("\n")
