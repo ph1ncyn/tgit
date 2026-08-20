@@ -30,6 +30,7 @@ var en = Messages{
 	PullDone:                "pull done",
 	PullResultPrefix:        "pull: ",
 	FetchDone:               "fetch done",
+	PrunedBranchesFmt:       "removed local branches with no remote: %s",
 	CheckoutDoneFmt:         "switched to %s",
 	BranchCreatedFmt:        "created and switched to branch %s",
 	CommitDoneMsg:           "commit created",
