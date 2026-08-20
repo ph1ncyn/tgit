@@ -124,12 +124,15 @@ func (r *Repo) CurrentBranch() (string, error) {
 }
 
 // AheadBehind — насколько текущая ветка опережает/отстаёт от upstream.
-// Если upstream не настроен, возвращает (0, 0, err) — вызывающий код должен
-// просто скрыть индикатор, это не настоящая ошибка.
+// Если upstream не настроен (например, свежесозданная локальная ветка,
+// которую ещё ни разу не пушили — как Test-1 в примерах выше), это не
+// повод молчать: сравниваем HEAD со всеми remote-tracking ветками, чтобы
+// индикатор Push всё равно показал непроталкнутые коммиты. Behind в этом
+// случае всегда 0 — тянуть ещё не с чего, upstream не настроен.
 func (r *Repo) AheadBehind() (ahead, behind int, err error) {
 	out, err := runGit(r.Root, "rev-list", "--left-right", "--count", "HEAD...@{upstream}")
 	if err != nil {
-		return 0, 0, err
+		return r.aheadNoUpstream()
 	}
 	parts := strings.Fields(out)
 	if len(parts) != 2 {
@@ -138,6 +141,18 @@ func (r *Repo) AheadBehind() (ahead, behind int, err error) {
 	ahead, _ = strconv.Atoi(parts[0])
 	behind, _ = strconv.Atoi(parts[1])
 	return ahead, behind, nil
+}
+
+func (r *Repo) aheadNoUpstream() (ahead, behind int, err error) {
+	out, err := runGit(r.Root, "rev-list", "--count", "HEAD", "--not", "--remotes")
+	if err != nil {
+		return 0, 0, nil // нет ни remotes, ни HEAD (пустой репозиторий) — просто нечего показывать
+	}
+	ahead, convErr := strconv.Atoi(strings.TrimSpace(out))
+	if convErr != nil {
+		return 0, 0, nil
+	}
+	return ahead, 0, nil
 }
 
 // Branches возвращает список локальных веток.
