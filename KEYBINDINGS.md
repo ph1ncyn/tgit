@@ -1,177 +1,190 @@
-# tgit — горячие клавиши
+# tgit — keybindings
 
-Полный список сочетаний клавиш по экранам. Краткая версия — в [README.md](README.md#главный-экран);
-здесь — исчерпывающая, включая экран входа и все модалки. Мышь описана отдельно в
-[README.md#мышь](README.md#мышь).
+Full list of keybindings by screen. A short version is in [README.md](README.md#main-screen);
+this one is exhaustive, including the login screen and every modal. The mouse is documented
+separately in [README.md#mouse](README.md#mouse).
 
-Везде, где не указано иное, **`Ctrl+C`** закрывает tgit.
-
----
-
-## 1. Экран входа (GitHub)
-
-Показывается при первом запуске (или после `g` с главного экрана), пока не сохранён рабочий токен.
-
-| Клавиша     | Действие                                                          |
-|-------------|---------------------------------------------------------------------|
-| `Enter`     | проверить введённый токен через GitHub API и войти                  |
-| `Ctrl+O`    | открыть ссылку создания токена в браузере по умолчанию               |
-| `Esc`       | пропустить вход — работать локально без GitHub (можно войти позже, `g`) |
-| `Ctrl+C`    | выйти из tgit                                                        |
-
-Пока идёт тихая проверка ранее сохранённого токена (при старте) — доступен только `Esc`
-(пропустить ожидание) и `Ctrl+C`.
+Unless stated otherwise, **`Ctrl+C`** closes tgit anywhere.
 
 ---
 
-## 2. Экран "репозиторий не найден"
+## 0. Language selection screen
 
-Показывается вместо главного экрана, если текущая папка — не git-репозиторий (`.git` не
-найден). Предлагает открыть один из недавних проектов tgit или склонировать репозиторий прямо
-в текущую папку.
+Shown before anything else, on every launch, before the login screen.
 
-| Клавиша     | Действие                                                          |
-|-------------|---------------------------------------------------------------------|
-| `↑` / `k`   | вверх по списку недавних проектов                                   |
-| `↓` / `j`   | вниз по списку недавних проектов                                    |
-| `Enter`     | открыть выбранный недавний проект (переключает на его главный экран) |
-| `c`         | перейти к вводу URL для клонирования репозитория в текущую папку     |
-| `g`         | войти в GitHub / сменить токен (недоступно, пока вводится URL)       |
-| `Ctrl+C`    | выйти из tgit                                                        |
-
-**В режиме ввода URL (после `c`):**
-
-| Клавиша     | Действие                                                          |
-|-------------|---------------------------------------------------------------------|
-| `Enter`     | склонировать репозиторий по введённому URL в текущую папку           |
-| `Esc`       | вернуться к списку недавних проектов                                 |
-| `Ctrl+C`    | выйти из tgit                                                        |
-
-После успешного открытия недавнего проекта или клонирования tgit сразу показывает главный
-экран для этого репозитория.
+| Key         | Action                                                            |
+|-------------|--------------------------------------------------------------------|
+| `↑` / `k`   | move selection up                                                   |
+| `↓` / `j`   | move selection down                                                 |
+| `Enter`     | confirm the selected language and continue to the login/token screen |
+| `Ctrl+C`    | quit tgit                                                            |
 
 ---
 
-## 3. Главный экран
+## 1. Login screen (GitHub)
 
-Четыре панели: **Ветки**, **Файлы**, **Лог**, **Diff**. Активная панель подсвечена рамкой.
+Shown on first launch (or after `g` from the main screen), until a working token is saved.
 
-### Навигация и общие действия
+| Key         | Action                                                            |
+|-------------|----------------------------------------------------------------------|
+| `Enter`     | verify the entered token against the GitHub API and sign in          |
+| `Ctrl+O`    | open the token-creation link in the default browser                  |
+| `Esc`       | skip sign-in — work locally without GitHub (you can sign in later with `g`) |
+| `Ctrl+C`    | quit tgit                                                             |
 
-| Клавиша            | Действие                                                          |
-|---------------------|----------------------------------------------------------------------|
-| `Tab`               | следующая панель (Ветки → Файлы → Лог → Diff → Ветки…)              |
-| `Shift+Tab`         | предыдущая панель                                                    |
-| `↑` / `k`           | вверх по списку активной панели (в Diff — скролл вверх)              |
-| `↓` / `j`           | вниз по списку активной панели (в Diff — скролл вниз)                |
-| `r`                 | обновить данные репозитория (ветки, файлы, лог)                     |
-| `g`                 | войти в GitHub / сменить токен                                       |
-| `Ctrl+C`            | выйти                                                                 |
-
-### Контекстные клавиши (зависят от активной панели)
-
-| Клавиша     | В панели «Файлы»                        | В панели «Ветки»                  | В «Логе» / «Diff» |
-|-------------|-------------------------------------------|--------------------------------------|--------------------|
-| `space`     | застейджить / убрать из индекса файл под курсором | —                          | — |
-| `enter`     | то же, что `space`                        | checkout выбранной ветки             | — |
-| `y`         | —                                          | —                                     | в Логе — скопировать полный хеш коммита в буфер обмена |
-
-### Действия и диалоги (работают из любой панели)
-
-| Клавиша   | Открывает / выполняет                                                                    |
-|-----------|---------------------------------------------------------------------------------------------|
-| `c`       | новый коммит — модалка ввода сообщения (нужны застейдженные файлы, иначе покажет подсказку) |
-| `b`       | переключатель веток — модалка с фильтром и созданием новой ветки                            |
-| `s`       | **Stash** — модалка со списком стэшей                                                        |
-| `S`       | быстрый pop последнего стэша, без открытия модалки Stash                                     |
-| `d`       | **Doctor** — сканирует репозиторий на типовые проблемы                                       |
-| `p`       | push (использует сохранённый GitHub-токен для HTTPS-репозиториев github.com)                |
-| `P`       | pull                                                                                          |
-| `f`       | fetch --all                                                                                   |
-
-Во время выполнения действия (push/pull/checkout/commit/…) показывается спиннер в строке
-статуса; новые действия с клавиатуры в этот момент игнорируются до завершения текущего.
+While a previously saved token is being silently verified (at startup), only `Esc`
+(skip the wait) and `Ctrl+C` are available.
 
 ---
 
-## 4. Модалка коммита (`c`)
+## 2. "Repository not found" screen
 
-| Клавиша   | Действие                                   |
+Shown instead of the main screen if the current folder isn't a git repository (no `.git`
+found). Offers to open one of the recent tgit projects or clone a repository right into the
+current folder.
+
+| Key         | Action                                                            |
+|-------------|----------------------------------------------------------------------|
+| `↑` / `k`   | move up the list of recent projects                                  |
+| `↓` / `j`   | move down the list of recent projects                                |
+| `Enter`     | open the selected recent project (switches to its main screen)       |
+| `c`         | switch to entering a URL to clone a repository into the current folder |
+| `g`         | sign in to GitHub / change token (unavailable while entering a URL)  |
+| `Ctrl+C`    | quit tgit                                                             |
+
+**In URL-entry mode (after `c`):**
+
+| Key         | Action                                                            |
+|-------------|----------------------------------------------------------------------|
+| `Enter`     | clone the repository at the entered URL into the current folder      |
+| `Esc`       | go back to the list of recent projects                               |
+| `Ctrl+C`    | quit tgit                                                             |
+
+After successfully opening a recent project or cloning, tgit immediately shows the main screen
+for that repository.
+
+---
+
+## 3. Main screen
+
+Four panels: **Branches**, **Files**, **Log**, **Diff**. The active panel is highlighted with a border.
+
+### Navigation and general actions
+
+| Key                 | Action                                                            |
+|---------------------|------------------------------------------------------------------|
+| `Tab`               | next panel (Branches → Files → Log → Diff → Branches…)          |
+| `Shift+Tab`         | previous panel                                                    |
+| `↑` / `k`           | up the active panel's list (in Diff — scroll up)                  |
+| `↓` / `j`           | down the active panel's list (in Diff — scroll down)              |
+| `r`                 | refresh repository data (branches, files, log)                    |
+| `g`                 | sign in to GitHub / change token                                   |
+| `Ctrl+C`            | quit                                                               |
+
+### Context-dependent keys (depend on the active panel)
+
+| Key         | In the "Files" panel                       | In the "Branches" panel              | In "Log" / "Diff" |
+|-------------|---------------------------------------------|--------------------------------------|--------------------|
+| `space`     | stage / unstage the file under the cursor    | —                                     | — |
+| `enter`     | same as `space`                              | checkout the selected branch          | — |
+| `y`         | —                                             | —                                     | in Log — copy the full commit hash to the clipboard |
+
+### Actions and dialogs (work from any panel)
+
+| Key       | Opens / performs                                                                              |
+|-----------|-------------------------------------------------------------------------------------------------|
+| `c`       | new commit — a message-input modal (needs staged files, otherwise shows a hint)                 |
+| `b`       | branch switcher — a modal with a filter and the ability to create a new branch                  |
+| `s`       | **Stash** — a modal listing stashes                                                             |
+| `S`       | quick pop of the latest stash, without opening the Stash modal                                  |
+| `d`       | **Doctor** — scans the repository for common problems                                           |
+| `p`       | push (uses the saved GitHub token for HTTPS repositories on github.com)                         |
+| `P`       | pull                                                                                             |
+| `f`       | fetch --all                                                                                       |
+
+While an action is running (push/pull/checkout/commit/…), a spinner shows in the status line;
+new keyboard actions are ignored until the current one finishes.
+
+---
+
+## 4. Commit modal (`c`)
+
+| Key       | Action                                       |
 |-----------|-----------------------------------------------|
-| любые символы | ввод текста сообщения коммита             |
-| `Enter`   | создать коммит из застейдженных файлов        |
-| `Esc`     | отменить и вернуться на главный экран         |
+| any character | types into the commit message              |
+| `Enter`   | create a commit from the staged files          |
+| `Esc`     | cancel and return to the main screen           |
 
 ---
 
-## 5. Переключатель веток (`b`)
+## 5. Branch switcher (`b`)
 
-| Клавиша   | Действие                                                                 |
-|-----------|-----------------------------------------------------------------------------|
-| любые символы | фильтр списка веток по подстроке (регистр не важен)                    |
-| `↑` / `↓` | навигация по отфильтрованному списку                                     |
-| `Enter`   | checkout выбранной ветки; если совпадений нет — создать новую ветку с введённым именем и переключиться на неё |
-| `Esc`     | отменить и вернуться на главный экран                                     |
+| Key       | Action                                                                     |
+|-----------|-------------------------------------------------------------------------------|
+| any character | filters the branch list by substring (case-insensitive)                   |
+| `↑` / `↓` | navigate the filtered list                                                     |
+| `Enter`   | checkout the selected branch; if there's no match — create a new branch with the entered name and switch to it |
+| `Esc`     | cancel and return to the main screen                                           |
 
 ---
 
 ## 6. Doctor (`d`)
 
-### Список проблем
+### Issue list
 
-| Клавиша      | Действие                                             |
-|--------------|----------------------------------------------------------|
-| `↑`/`↓`, `j`/`k` | выбрать проблему в списке                            |
-| `Enter`, `f` | перейти к подтверждению исправления выбранной проблемы    |
-| `Esc`, `q`   | закрыть Doctor и вернуться на главный экран                |
+| Key          | Action                                                     |
+|--------------|----------------------------------------------------------------|
+| `↑`/`↓`, `j`/`k` | select an issue in the list                                 |
+| `Enter`, `f` | go to confirming the fix for the selected issue                  |
+| `Esc`, `q`   | close Doctor and return to the main screen                        |
 
-### Подтверждение исправления
+### Fix confirmation
 
-Исправление может удалить файлы и/или изменить `.gitignore` — поэтому отдельное подтверждение:
+Fixing may delete files and/or modify `.gitignore` — hence a separate confirmation step:
 
-| Клавиша      | Действие                              |
-|--------------|-------------------------------------------|
-| `y`, `Enter` | подтвердить и исправить                    |
-| `n`, `Esc`   | отменить, вернуться к списку проблем        |
+| Key          | Action                                     |
+|--------------|-------------------------------------------------|
+| `y`, `Enter` | confirm and fix                                  |
+| `n`, `Esc`   | cancel, return to the issue list                  |
 
 ---
 
 ## 7. Stash (`s`)
 
-### Список стэшей
+### Stash list
 
-| Клавиша      | Действие                                                                 |
-|--------------|-------------------------------------------------------------------------------|
-| `↑`/`↓`, `j`/`k` | выбрать стэш в списке (справа/снизу показывается превью изменённых файлов) |
-| `n`          | спрятать текущие незакоммиченные изменения в новый стэш                        |
-| `Enter`, `p` | **pop** — вернуть файлы из стэша в рабочий каталог и удалить запись            |
-| `a`          | **apply** — вернуть файлы, но оставить запись в стэше                          |
-| `x`          | **drop** — перейти к подтверждению удаления записи без применения              |
-| `Esc`, `q`   | закрыть Stash и вернуться на главный экран                                     |
+| Key          | Action                                                                       |
+|--------------|-------------------------------------------------------------------------------------|
+| `↑`/`↓`, `j`/`k` | select a stash in the list (a preview of its changed files shows on the right/below) |
+| `n`          | stash the current uncommitted changes into a new entry                               |
+| `Enter`, `p` | **pop** — restore the files from the stash into the working directory and remove the entry |
+| `a`          | **apply** — restore the files but keep the entry in the stash                        |
+| `x`          | **drop** — go to confirming deletion of the entry without applying it                |
+| `Esc`, `q`   | close Stash and return to the main screen                                            |
 
-### Подтверждение drop
+### Drop confirmation
 
-Удаление стэша без применения безвозвратно — отдельное подтверждение:
+Deleting a stash without applying it is permanent — hence a separate confirmation:
 
-| Клавиша      | Действие                              |
-|--------------|-------------------------------------------|
-| `y`, `Enter` | подтвердить и удалить стэш                 |
-| `n`, `Esc`   | отменить, вернуться к списку стэшей         |
+| Key          | Action                                     |
+|--------------|-------------------------------------------------|
+| `y`, `Enter` | confirm and delete the stash                     |
+| `n`, `Esc`   | cancel, return to the stash list                  |
 
 ---
 
-## Шпаргалка (главный экран, самое частое)
+## Cheat sheet (main screen, the most common ones)
 
 ```
-Tab / Shift+Tab   переключить панель
-↑↓ или jk         навигация / скролл
-space             застейджить / снять со стейджа
-enter             стейдж (Файлы) · checkout (Ветки)
-c  b  s  d        коммит · ветки · стэш · doctor
+Tab / Shift+Tab   switch panel
+↑↓ or jk          navigate / scroll
+space             stage / unstage
+enter             stage (Files) · checkout (Branches)
+c  b  s  d        commit · branch · stash · doctor
 p  P  f           push · pull · fetch
-S                 быстрый pop последнего стэша
-y                 копировать хеш коммита (в Логе)
-r                 обновить
-g                 GitHub-логин
-Ctrl+C            выход
+S                 quick pop of the latest stash
+y                 copy commit hash (in Log)
+r                 refresh
+g                 GitHub sign-in
+Ctrl+C            quit
 ```

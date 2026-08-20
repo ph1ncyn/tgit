@@ -4,47 +4,54 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 
 	"tgit/internal/gitrepo"
+	"tgit/internal/i18n"
 	"tgit/internal/secret"
 )
 
 type screenState int
 
 const (
-	stateCheckingToken screenState = iota
+	stateLang screenState = iota
+	stateCheckingToken
 	stateLogin
 	stateMain
 	stateNoRepo
 )
 
-// App — корневая модель Bubble Tea, переключающая экран входа, главный экран
-// и экран "репозиторий не найден".
+// App — корневая модель Bubble Tea, переключающая экран выбора языка, экран
+// входа, главный экран и экран "репозиторий не найден".
 type App struct {
 	state  screenState
+	lang   langModel
 	login  loginModel
 	main   mainModel
 	noRepo noRepoModel
 
-	pendingToken  string
-	width, height int
+	pendingToken   string
+	afterLangState screenState
+	width, height  int
 }
 
-// NewApp собирает приложение. Если в системном хранилище уже есть токен,
-// приложение тихо проверит его перед показом главного экрана; если токена
-// нет — сразу показывает экран входа со ссылкой на создание токена. Если repo
-// не открылся (текущая папка — не git-репозиторий), после экрана входа
+// NewApp собирает приложение. Первый экран всегда — выбор языка интерфейса.
+// После выбора языка: если в системном хранилище уже есть токен, приложение
+// тихо проверит его перед показом главного экрана; если токена нет — сразу
+// показывает экран входа со ссылкой на создание токена. Если repo не
+// открылся (текущая папка — не git-репозиторий), после экрана входа
 // показывается не главный экран, а stateNoRepo.
 func NewApp(repo *gitrepo.Repo, cwd string) App {
 	a := App{
+		lang:   newLangModel(),
 		login:  newLoginModel(),
 		main:   newMainModel(repo),
 		noRepo: newNoRepoModel(cwd),
 	}
+	a.state = stateLang
 	if tok, err := secret.Load(); err == nil && tok != "" {
-		a.state = stateCheckingToken
+		a.afterLangState = stateCheckingToken
 		a.pendingToken = tok
 		a.login.checking = true
 	} else {
-		a.state = stateLogin
+		a.afterLangState = stateLogin
 	}
 	return a
 }
@@ -60,31 +67,51 @@ func (a App) afterAuthState() screenState {
 }
 
 func (a App) Init() tea.Cmd {
-	cmds := []tea.Cmd{a.main.Init(), a.noRepo.Init()}
-	switch a.state {
-	case stateCheckingToken:
-		cmds = append(cmds, validateCmd(a.pendingToken), a.login.spinner.Tick)
-	case stateLogin:
-		cmds = append(cmds, a.login.Init())
-	}
-	return tea.Batch(cmds...)
+	// Экран выбора языка не запускает validateCmd/login.Init() сразу — эти
+	// команды откладываются до подтверждения языка (см. stateLang в Update),
+	// иначе тихая проверка токена могла бы отрендериться раньше, чем
+	// пользователь успеет выбрать язык.
+	return tea.Batch(a.main.Init(), a.noRepo.Init(), a.lang.Init())
 }
 
 func (a App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
 		a.width, a.height = msg.Width, msg.Height
-		var lcmd, mcmd, ncmd tea.Cmd
+		var lgcmd, lcmd, mcmd, ncmd tea.Cmd
+		a.lang, lgcmd = a.lang.Update(msg)
 		a.login, lcmd = a.login.Update(msg)
 		a.main, mcmd = a.main.Update(msg)
 		a.noRepo, ncmd = a.noRepo.Update(msg)
-		return a, tea.Batch(lcmd, mcmd, ncmd)
+		return a, tea.Batch(lgcmd, lcmd, mcmd, ncmd)
 
 	case tea.KeyMsg:
 		if msg.Type == tea.KeyCtrlC {
 			return a, tea.Quit
 		}
 		switch a.state {
+		case stateLang:
+			var chosen i18n.Lang
+			var confirmed bool
+			a.lang, chosen, confirmed = a.lang.handleKey(msg)
+			if !confirmed {
+				return a, nil
+			}
+			i18n.Set(chosen)
+			// commitInput/branchFilter получили плейсхолдеры от newMainModel ещё
+			// до выбора языка (main собирается в NewApp), поэтому обновляем их
+			// текст здесь же, а не полагаемся на повторное чтение i18n.T.
+			a.main.commitInput.Placeholder = i18n.T.CommitInputPlaceholder
+			a.main.branchFilter.Placeholder = i18n.T.BranchFilterPlaceholder
+			a.state = a.afterLangState
+			switch a.state {
+			case stateCheckingToken:
+				return a, tea.Batch(validateCmd(a.pendingToken), a.login.spinner.Tick)
+			case stateLogin:
+				return a, a.login.Init()
+			}
+			return a, nil
+
 		case stateCheckingToken:
 			if msg.Type == tea.KeyEsc {
 				a.state = a.afterAuthState()
@@ -133,7 +160,7 @@ func (a App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			a.login.checking = false
 			if wasSilentCheck {
 				_ = secret.Delete()
-				a.login.errMsg = "сохранённый токен недействителен, войдите заново"
+				a.login.errMsg = i18n.T.SavedTokenInvalid
 				a.state = stateLogin
 				return a, nil
 			}
@@ -168,16 +195,19 @@ func (a App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return a, tea.Batch(ncmd, a.main.Init())
 
 	default:
-		var lcmd, mcmd, ncmd tea.Cmd
+		var lgcmd, lcmd, mcmd, ncmd tea.Cmd
+		a.lang, lgcmd = a.lang.Update(msg)
 		a.login, lcmd = a.login.Update(msg)
 		a.main, mcmd = a.main.Update(msg)
 		a.noRepo, ncmd = a.noRepo.Update(msg)
-		return a, tea.Batch(lcmd, mcmd, ncmd)
+		return a, tea.Batch(lgcmd, lcmd, mcmd, ncmd)
 	}
 }
 
 func (a App) View() string {
 	switch a.state {
+	case stateLang:
+		return a.lang.View()
 	case stateCheckingToken, stateLogin:
 		return a.login.View()
 	case stateNoRepo:

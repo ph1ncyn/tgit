@@ -1,6 +1,7 @@
 package ui
 
 import (
+	"fmt"
 	"os"
 	"strings"
 
@@ -11,6 +12,7 @@ import (
 
 	"tgit/internal/config"
 	"tgit/internal/gitrepo"
+	"tgit/internal/i18n"
 )
 
 type noRepoMode int
@@ -156,11 +158,11 @@ func (m noRepoModel) handleKey(msg tea.KeyMsg) (noRepoModel, tea.Cmd) {
 		case tea.KeyEnter:
 			url := strings.TrimSpace(m.url.Value())
 			if url == "" {
-				m.err = "введите URL репозитория"
+				m.err = i18n.T.EnterRepoURLErr
 				return m, nil
 			}
 			m.err = ""
-			m.busy, m.busyLabel = true, "клонирую..."
+			m.busy, m.busyLabel = true, i18n.T.CloningBusy
 			return m, tea.Batch(cloneCmd(url, m.dir), m.spinner.Tick)
 		}
 		var cmd tea.Cmd
@@ -180,7 +182,7 @@ func (m noRepoModel) handleKey(msg tea.KeyMsg) (noRepoModel, tea.Cmd) {
 	case "enter":
 		if m.cursor < len(m.entries) {
 			m.err = ""
-			m.busy, m.busyLabel = true, "открываю проект..."
+			m.busy, m.busyLabel = true, i18n.T.OpeningProjectBusy
 			return m, tea.Batch(openRecentCmd(m.entries[m.cursor].Path), m.spinner.Tick)
 		}
 	case "c":
@@ -196,24 +198,24 @@ func (m noRepoModel) handleKey(msg tea.KeyMsg) (noRepoModel, tea.Cmd) {
 func (m noRepoModel) View() string {
 	var b strings.Builder
 	b.WriteString(titleStyle.Render("tgit") + "\n\n")
-	b.WriteString(errorStyle.Render("В папке "+m.dir+" не найден git-репозиторий.") + "\n\n")
+	b.WriteString(errorStyle.Render(fmt.Sprintf(i18n.T.NoRepoNotFoundFmt, m.dir)) + "\n\n")
 
 	if m.mode == noRepoModeClone {
-		b.WriteString("Клонировать сюда: " + m.url.View() + "\n\n")
+		b.WriteString(i18n.T.CloneHereLabel + m.url.View() + "\n\n")
 		if m.busy {
 			b.WriteString(m.spinner.View() + " " + helpStyle.Render(m.busyLabel) + "\n\n")
 		}
 		if m.err != "" {
 			b.WriteString(errorStyle.Render("✗ "+m.err) + "\n\n")
 		}
-		b.WriteString(helpStyle.Render("enter — клонировать  •  esc — назад  •  ctrl+c — выйти"))
+		b.WriteString(helpStyle.Render(i18n.T.CloneModalHelp))
 		return lipgloss.NewStyle().Padding(1, 2).Render(b.String())
 	}
 
 	if len(m.entries) == 0 {
-		b.WriteString(helpStyle.Render("недавних проектов tgit пока нет") + "\n\n")
+		b.WriteString(helpStyle.Render(i18n.T.NoRecentProjectsMsg) + "\n\n")
 	} else {
-		b.WriteString(helpStyle.Render("Недавние проекты:") + "\n")
+		b.WriteString(helpStyle.Render(i18n.T.RecentProjectsLabel) + "\n")
 		for i, e := range m.entries {
 			prefix := "  "
 			style := lipgloss.NewStyle()
@@ -232,9 +234,9 @@ func (m noRepoModel) View() string {
 		b.WriteString(errorStyle.Render("✗ "+m.err) + "\n\n")
 	}
 
-	help := "c — клонировать репозиторий в эту папку  •  ctrl+c — выйти"
+	help := i18n.T.CloneActionHelp
 	if len(m.entries) > 0 {
-		help = "↑/↓ — выбрать  •  enter — открыть проект  •  " + help
+		help = i18n.T.SelectOpenHelpPrefix + help
 	}
 	b.WriteString(helpStyle.Render(help))
 	return lipgloss.NewStyle().Padding(1, 2).Render(b.String())

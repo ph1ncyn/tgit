@@ -1,22 +1,49 @@
-# tgit — интерфейс
+# tgit — interface
 
-Самый удобный и функциональный git-терминал: мышь как полноценный способ работы (не только клавиатура), приятный визуальный вид, встроенный «доктор» для типовых проблем репозитория (в т.ч. мусорные файлы macOS) и быстрое переключение веток.
+The most convenient, feature-rich git terminal: the mouse as a first-class way of working (not
+just the keyboard), a pleasant visual look, a built-in "doctor" for common repository problems
+(including macOS junk files), and fast branch switching.
 
-Стек реализации: **Go + Bubble Tea + Lip Gloss + Bubbles**. Это даёт нормальную поддержку мыши в терминале (клики, скролл, hover), быстрый рендеринг и работу на Linux/macOS/Windows одним бинарником.
+Implementation stack: **Go + Bubble Tea + Lip Gloss + Bubbles**. This gives proper mouse support
+in the terminal (clicks, scroll, hover), fast rendering, and a single binary that runs on
+Linux/macOS/Windows.
 
-Чем отличается от lazygit/gitui/tig:
-- Мышь — не довесок, а полноценный интерфейс: клики, ховеры, контекстные меню, drag для resize.
-- Встроенный **Doctor** — сканер типовых проблем репозитория с кнопками быстрого фикса.
-- Command palette (`Ctrl+K`) — не обязательно помнить горячие клавиши.
+How it differs from lazygit/gitui/tig:
+- The mouse isn't an afterthought, it's a full interface: clicks, hovers, context menus, drag to resize.
+- A built-in **Doctor** — a scanner for common repository problems with one-click fix buttons.
+- A command palette (`Ctrl+K`) — no need to memorize every hotkey.
 
 ---
 
-## 1. Главный экран
+## 0. Language selection
+
+The very first screen tgit shows, before the token/login screen, lets you pick the interface
+language:
 
 ```
-┌ tgit ── ~/projects/tgit ── ⎇ main ↑2 ↓0 ── ✓ чисто ─────────────────────────┐
+┌────────────────────────────────────────────┐
+│ tgit                                        │
+│                                              │
+│ Select interface language:                  │
+│                                              │
+│ > English                                   │
+│   Русский                                   │
+│                                              │
+│ ↑/↓ — select  •  enter — confirm            │
+└──────────────────────────────────────────────┘
+```
+
+`↑`/`↓` moves the selection, `Enter` confirms and switches every other screen (login, main
+screen, panels, dialogs, status messages) to the chosen language.
+
+---
+
+## 1. Main screen
+
+```
+┌ tgit ── ~/projects/tgit ── ⎇ main ↑2 ↓0 ── ✓ clean ─────────────────────────┐
 │                                                                              │
-│ ┌─ Ветки ──────────────┐ ┌─ Файлы ──────────────┐ ┌─ Diff: cli/app.go ────┐ │
+│ ┌─ Branches ───────────┐ ┌─ Files ───────────────┐ ┌─ Diff: cli/app.go ────┐ │
 │ │ ⎇ main          [•]  │ │ Staged (2)            │ │  12  func Run() {     │ │
 │ │   feature/doctor     │ │  [x] M cli/app.go     │ │  13 -   old()         │ │
 │ │   fix/apple-double   │ │  [x] A doctor/rules.go│ │  13 +   New()          │ │
@@ -25,8 +52,8 @@
 │ │ ── tags ──            │ │ Untracked (1)         │ │                        │ │
 │ │   v0.1.0             │ │  [ ] ? notes.txt       │ │                        │ │
 │ └───────────────────────┘ └────────────────────────┘ └────────────────────────┘ │
-│ ┌─ Стэш ───────────────┐ ┌─ Лог ─────────────────────────────────────────────┐ │
-│ │  (пусто)              │ │ ● a1b2c3 fix: doctor rule for ._files (HEAD)      │ │
+│ ┌─ Stash ──────────────┐ ┌─ Log ──────────────────────────────────────────────┐ │
+│ │  (empty)              │ │ ● a1b2c3 fix: doctor rule for ._files (HEAD)      │ │
 │ │                        │ │ ● 9f8e7d feat: branch switcher                    │ │
 │ │                        │ │ │ ● 4c5d6e wip                                    │ │
 │ │                        │ │ ●/  1122aa init                                  │ │
@@ -37,121 +64,133 @@
 └──────────────────────────────────────────────────────────────────────────────┘
 ```
 
-**Панели:**
-- **Ветки** — локальные, remote, теги; текущая помечена `[•]`.
-- **Файлы** — Staged / Unstaged / Untracked, чекбоксы слева.
-- **Diff** — содержимое выбранного файла/коммита справа.
-- **Стэш** — список сохранённых стэшей.
-- **Лог** — граф коммитов.
-- **Верхняя строка** — репозиторий, текущая ветка, ahead/behind, статус чистоты.
-- **Нижний тулбар** — кликабельные кнопки действий + подсказка горячей клавиши под каждой. Кнопка `Doctor` показывает бейдж с числом найденных проблем.
+**Panels:**
+- **Branches** — local, remote, tags; the current one is marked `[•]`.
+- **Files** — Staged / Unstaged / Untracked, checkboxes on the left.
+- **Diff** — the content of the selected file/commit on the right.
+- **Stash** — the list of saved stashes.
+- **Log** — the commit graph.
+- **Top bar** — repository, current branch, ahead/behind, cleanliness status.
+- **Bottom toolbar** — clickable action buttons with the hotkey hint under each. The `Doctor`
+  button shows a badge with the number of issues found.
 
-Активная панель подсвечена акцентной рамкой; `Tab`/клик — переключение фокуса.
-
----
-
-## 2. Кнопки и мышь
-
-- **Тулбар** — ряд кнопок с рамкой; при наведении подсветка (hover), клик выполняет действие. У каждой кнопки под ней — буква горячей клавиши.
-- **Клик по файлу** — toggle stage/unstage (клик по чекбоксу слева от имени).
-- **Клик по ветке** — предложение checkout; если есть незакоммиченные изменения — подтверждение (stash / commit / отмена).
-- **Клик по коммиту** в графе — открывает diff/детали коммита в правой панели.
-- **Скролл колесом** — по каждой панели независимо, курсор наводится на панель.
-- **Drag** границы между панелями — resize (не в первой версии, помечено как будущее расширение).
-- **Правый клик** — контекстное меню, состав зависит от контекста:
-  - на файле: Stage / Unstage / Discard / Diff
-  - на ветке: Checkout / Rename / Delete / Merge into current
-  - на коммите: Checkout / Cherry-pick / Revert / Copy hash
-- Все действия мыши дублируются горячими клавишами — мышь ускоряет, но не единственный путь.
+The active panel is highlighted with an accent border; `Tab`/click switches focus.
 
 ---
 
-## 3. Git Doctor — решение типовых проблем
+## 2. Buttons and mouse
 
-Кнопка `[Doctor]` открывает панель со списком найденных проблем, статусом и кнопкой быстрого фикса напротив каждой:
+- **Toolbar** — a row of bordered buttons; hover highlights them, click runs the action. Each
+  button has its hotkey letter shown underneath.
+- **Clicking a file** — toggles stage/unstage (click the checkbox to the left of the name).
+- **Clicking a branch** — offers checkout; if there are uncommitted changes, asks for
+  confirmation (stash / commit / cancel).
+- **Clicking a commit** in the graph — opens its diff/details in the right panel.
+- **Scrolling** — independent per panel, wherever the cursor is hovering.
+- **Dragging** a border between panels — resize (not in the first version, marked as a future
+  extension).
+- **Right click** — a context menu whose contents depend on what was clicked:
+  - on a file: Stage / Unstage / Discard / Diff
+  - on a branch: Checkout / Rename / Delete / Merge into current
+  - on a commit: Checkout / Cherry-pick / Revert / Copy hash
+- Every mouse action has a keyboard equivalent — the mouse speeds things up, it's never the only way.
+
+---
+
+## 3. Git Doctor — fixing common problems
+
+The `[Doctor]` button opens a panel listing the problems found, their status, and a quick-fix
+button next to each:
 
 ```
 ┌─ Doctor ───────────────────────────────────────────────────────────────┐
-│ ⚠ 3 проблемы найдены                                                    │
+│ ⚠ 3 issues found                                                        │
 │                                                                          │
-│ • Файлы macOS (._*, .DS_Store) засоряют репозиторий      [Исправить]  │
-│     ._app.go, .DS_Store в cli/                                         │
-│     → добавить в .gitignore / global gitignore / git rm --cached       │
+│ • macOS files (._*, .DS_Store) cluttering the repo         [Fix]      │
+│     ._app.go, .DS_Store in cli/                                        │
+│     → add to .gitignore / global gitignore / git rm --cached           │
 │                                                                          │
-│ • node_modules/ отслеживается, но выглядит как сборочный  [Исправить]  │
-│     → добавить паттерн в .gitignore                                    │
+│ • node_modules/ is tracked but looks like a build dir      [Fix]      │
+│     → add a pattern to .gitignore                                      │
 │                                                                          │
-│ • Смешанные окончания строк (CRLF/LF) в 4 файлах          [Исправить]  │
-│     → предложить .gitattributes                                        │
+│ • Mixed line endings (CRLF/LF) in 4 files                  [Fix]      │
+│     → offer to add .gitattributes                                      │
 └──────────────────────────────────────────────────────────────────────────┘
 ```
 
-Правила первой версии:
-- **AppleDouble-файлы `._*` и `.DS_Store`** (в т.ч. уже закоммиченные) → «Добавить в `.gitignore`» / «Добавить в глобальный `~/.gitignore_global`» / «Удалить из репозитория (`git rm --cached`)».
-- **Untracked, но похожие на сборочные/служебные** (node_modules, .env, dist/) → предложение добавить паттерн в `.gitignore`.
-- **Смешанные line endings (CRLF/LF)** → предложение `.gitattributes`.
-- **Незавершённый merge/rebase/конфликт** → быстрый переход в conflict-resolution view.
-- **Detached HEAD** → предложение создать ветку или вернуться на предыдущую.
-- **Крупные файлы** в истории/staged → предложение вынести в Git LFS.
+Rules in the first version:
+- **AppleDouble files `._*` and `.DS_Store`** (including already-committed ones) → "Add to
+  `.gitignore`" / "Add to global `~/.gitignore_global`" / "Remove from the repository
+  (`git rm --cached`)".
+- **Untracked but looking like build/tooling output** (node_modules, .env, dist/) → offer to
+  add a pattern to `.gitignore`.
+- **Mixed line endings (CRLF/LF)** → offer to add `.gitattributes`.
+- **Unfinished merge/rebase/conflict** → quick jump into the conflict-resolution view.
+- **Detached HEAD** → offer to create a branch or return to the previous one.
+- **Large files** in history/staged → offer to move them to Git LFS.
 
-Список правил расширяемый — новые проверки добавляются без изменения остального интерфейса.
+The rule list is extensible — new checks can be added without changing the rest of the interface.
 
 ---
 
-## 4. Переключение веток
+## 4. Switching branches
 
-- Панель «Ветки» слева: локальные / remote / теги, текущая подсвечена.
-- Быстрый переключатель — `Ctrl+B` или клик по кнопке `[Branch]`: модальное окно с fuzzy-search по имени, навигация стрелками или мышью, `Enter`/клик — checkout.
+- The "Branches" panel on the left: local / remote / tags, the current one highlighted.
+- Quick switcher — `Ctrl+B` or click the `[Branch]` button: a modal with fuzzy-search by name,
+  arrow-key or mouse navigation, `Enter`/click — checkout.
 
 ```
-┌─ Переключить ветку ───────────────────────┐
+┌─ Switch branch ────────────────────────────┐
 │ > feat                                     │
 │   feature/doctor            ↑2 ↓0          │
 │   feature/branch-switcher   ↑0 ↓1          │
-│ ── недавние ──                             │
+│ ── recent ──                               │
 │   main                                     │
 │   fix/apple-double                         │
 └─────────────────────────────────────────────┘
 ```
 
-- Сверху — «недавние ветки» для мгновенного прыжка туда-обратно.
-- Рядом с каждой веткой — ahead/behind относительно upstream.
-- Если в рабочей директории есть незакоммиченные изменения — перед checkout предложение stash/commit/отмена.
+- At the top — "recent branches" for jumping back and forth instantly.
+- Next to each branch — ahead/behind relative to upstream.
+- If there are uncommitted changes in the working directory — a stash/commit/cancel prompt
+  appears before checkout.
 
 ---
 
-## 5. Визуальный стиль
+## 5. Visual style
 
-- Скруглённые рамки панелей (Lip Gloss borders); активная панель — акцентный цвет рамки.
-- Цветовая семантика:
-  - зелёный — staged / чисто
-  - красный — unstaged / conflict
-  - жёлтый — modified
-  - синий/циан — branch / remote
-  - серый — untracked / ignored
-- Тёмная и светлая темы; иконки через Nerd Font с текстовым ASCII-fallback, если шрифт недоступен.
-- Отдельная строка состояния внизу окна (не тулбар): репозиторий/ветка/режим (`NORMAL` / `COMMIT MSG` / `CONFLICT`).
-
----
-
-## 6. Command Palette
-
-`Ctrl+K` или клик по значку в верхней строке — окно быстрого поиска действия по имени (аналог VS Code): «checkout», «stash pop», «force push» и т.д. Полезно, пока не все горячие клавиши выучены наизусть.
+- Rounded panel borders (Lip Gloss borders); the active panel has an accent-colored border.
+- Color semantics:
+  - green — staged / clean
+  - red — unstaged / conflict
+  - yellow — modified
+  - blue/cyan — branch / remote
+  - gray — untracked / ignored
+- Dark and light themes; icons via Nerd Font with a plain-ASCII fallback if the font isn't available.
+- A separate status line at the bottom of the window (not the toolbar): repository/branch/mode
+  (`NORMAL` / `COMMIT MSG` / `CONFLICT`).
 
 ---
 
-## 7. На будущее (roadmap, без деталей реализации)
+## 6. Command palette
 
-- Визуальный interactive rebase (drag-and-drop коммитов).
-- Встроенный resolver конфликтов слияния (3-way view).
-- Blame-вид по файлу.
-- Поиск по репозиторию и по коммитам.
-- Интеграция с GitHub/GitLab: список PR, статус CI прямо в tgit.
-- Undo последнего git-действия.
-- Настраиваемые keybindings и тема через конфиг-файл.
+`Ctrl+K` or clicking the icon in the top bar — a quick-search window for actions by name (like
+VS Code): "checkout", "stash pop", "force push", etc. Useful until every hotkey is second nature.
+
+---
+
+## 7. Future work (roadmap, no implementation details)
+
+- Visual interactive rebase (drag-and-drop commits).
+- A built-in merge-conflict resolver (3-way view).
+- Per-file blame view.
+- Search across the repository and across commits.
+- GitHub/GitLab integration: PR list, CI status right inside tgit.
+- Undo for the last git action.
+- Configurable keybindings and theme via a config file.
 
 Stash GUI:
-┌─ Select files for stash ──────────────────┐  Дата означает последнее изменение
+┌─ Select files for stash ──────────────────┐  Date is the last-modified time
 │ [x] File1.txt                      1 week │
 │ [x]  main.py                       2 days │
 │ []  .env                           3 week │

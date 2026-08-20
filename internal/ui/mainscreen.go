@@ -13,6 +13,7 @@ import (
 	"tgit/internal/doctor"
 	"tgit/internal/ghauth"
 	"tgit/internal/gitrepo"
+	"tgit/internal/i18n"
 )
 
 type mainMode int
@@ -89,12 +90,12 @@ type mainModel struct {
 
 func newMainModel(repo *gitrepo.Repo) mainModel {
 	ci := textinput.New()
-	ci.Placeholder = "сообщение коммита"
+	ci.Placeholder = i18n.T.CommitInputPlaceholder
 	ci.CharLimit = 500
 	ci.Width = 60
 
 	bf := textinput.New()
-	bf.Placeholder = "фильтр веток / имя новой ветки"
+	bf.Placeholder = i18n.T.BranchFilterPlaceholder
 	bf.Width = 40
 
 	sp := spinner.New()
@@ -116,7 +117,7 @@ func (m mainModel) loadCmd() tea.Cmd {
 	repo := m.repo
 	return func() tea.Msg {
 		if repo == nil {
-			return repoDataMsg{err: fmt.Errorf("текущий каталог не git-репозиторий")}
+			return repoDataMsg{err: fmt.Errorf("%s", i18n.T.ErrNotGitRepoLocal)}
 		}
 		branch, err := repo.CurrentBranch()
 		if err != nil {
@@ -162,9 +163,9 @@ func (m mainModel) Update(msg tea.Msg) (mainModel, tea.Cmd) {
 
 	case diffLoadedMsg:
 		if msg.err != nil {
-			m.diff = "не удалось получить diff: " + msg.err.Error()
+			m.diff = i18n.T.DiffLoadFailedPrefix + msg.err.Error()
 		} else if msg.content == "" {
-			m.diff = "(пусто)"
+			m.diff = i18n.T.DiffEmptyPlaceholder
 		} else {
 			m.diff = msg.content
 		}
@@ -177,7 +178,7 @@ func (m mainModel) Update(msg tea.Msg) (mainModel, tea.Cmd) {
 	case doctorScannedMsg:
 		m.busy = false
 		if msg.err != nil {
-			m.status = "doctor: " + msg.err.Error()
+			m.status = i18n.T.DoctorPrefix + msg.err.Error()
 			m.statusErr = true
 			return m, nil
 		}
@@ -189,12 +190,12 @@ func (m mainModel) Update(msg tea.Msg) (mainModel, tea.Cmd) {
 	case doctorFixedMsg:
 		m.busy = false
 		if msg.err != nil {
-			m.status = "не удалось исправить: " + msg.err.Error()
+			m.status = i18n.T.DoctorFixFailedPrefix + msg.err.Error()
 			m.statusErr = true
 			m.mode = modeDoctorList
 			return m, nil
 		}
-		m.status = "исправлено: " + msg.title
+		m.status = i18n.T.DoctorFixedPrefix + msg.title
 		m.statusErr = false
 		m.mode = modeNormal
 		return m, m.loadCmd()
@@ -202,7 +203,7 @@ func (m mainModel) Update(msg tea.Msg) (mainModel, tea.Cmd) {
 	case stashListedMsg:
 		m.busy = false
 		if msg.err != nil {
-			m.status = "стэш: " + msg.err.Error()
+			m.status = i18n.T.StashPrefix + msg.err.Error()
 			m.statusErr = true
 			return m, nil
 		}
@@ -214,7 +215,7 @@ func (m mainModel) Update(msg tea.Msg) (mainModel, tea.Cmd) {
 
 	case stashStatMsg:
 		if msg.err != nil {
-			m.stashDetail = "не удалось получить содержимое: " + msg.err.Error()
+			m.stashDetail = i18n.T.StashContentFailedPrefix + msg.err.Error()
 		} else {
 			m.stashDetail = msg.content
 		}
@@ -275,11 +276,11 @@ func actionLabel(action string) string {
 	case "fetch":
 		return "fetch"
 	case "checkout":
-		return "переключение ветки"
+		return i18n.T.ActionCheckoutLabel
 	case "create-branch":
-		return "создание ветки"
+		return i18n.T.ActionCreateBranchLabel
 	case "commit":
-		return "коммит"
+		return i18n.T.ActionCommitLabel
 	case "stash-push":
 		return "stash"
 	case "stash-pop":
@@ -296,32 +297,32 @@ func actionSuccessText(action, arg, output string) string {
 	switch action {
 	case "push":
 		if output == "" {
-			return "push выполнен"
+			return i18n.T.PushDone
 		}
-		return "push: " + firstLine(output)
+		return i18n.T.PushResultPrefix + firstLine(output)
 	case "pull":
 		if output == "" {
-			return "pull выполнен"
+			return i18n.T.PullDone
 		}
-		return "pull: " + firstLine(output)
+		return i18n.T.PullResultPrefix + firstLine(output)
 	case "fetch":
-		return "fetch выполнен"
+		return i18n.T.FetchDone
 	case "checkout":
-		return "переключено на " + arg
+		return fmt.Sprintf(i18n.T.CheckoutDoneFmt, arg)
 	case "create-branch":
-		return "создана и выбрана ветка " + arg
+		return fmt.Sprintf(i18n.T.BranchCreatedFmt, arg)
 	case "commit":
-		return "коммит создан"
+		return i18n.T.CommitDoneMsg
 	case "stash-push":
-		return "изменения спрятаны в стэш"
+		return i18n.T.StashPushDoneMsg
 	case "stash-pop":
-		return "файлы возвращены из стэша"
+		return i18n.T.StashPopDoneMsg
 	case "stash-apply":
-		return "файлы применены из стэша (запись сохранена в стэше)"
+		return i18n.T.StashApplyDoneMsg
 	case "stash-drop":
-		return "стэш удалён"
+		return i18n.T.StashDropDoneMsg
 	}
-	return "готово"
+	return i18n.T.ActionDoneGeneric
 }
 
 func firstLine(s string) string {
@@ -377,7 +378,7 @@ func (m mainModel) handleNormalKey(msg tea.KeyMsg) (mainModel, tea.Cmd) {
 	case "y":
 		if m.focus == focusLog && m.commitCursor < len(m.commits) {
 			_ = clipboard.WriteAll(m.commits[m.commitCursor].Hash)
-			m.status = "хеш скопирован в буфер обмена"
+			m.status = i18n.T.HashCopiedMsg
 			m.statusErr = false
 		}
 		return m, nil
@@ -394,16 +395,16 @@ func (m mainModel) handleNormalKey(msg tea.KeyMsg) (mainModel, tea.Cmd) {
 		return m, textinput.Blink
 	case "d":
 		if m.repo == nil {
-			m.status, m.statusErr = "нет репозитория", true
+			m.status, m.statusErr = i18n.T.NoRepoErr, true
 			return m, nil
 		}
-		m.busy, m.busyLabel = true, "проверяю репозиторий..."
+		m.busy, m.busyLabel = true, i18n.T.CheckingRepoBusy
 		return m, tea.Batch(doctorScanCmd(m.repo), m.spinner.Tick)
 	case "s":
 		if m.repo == nil {
 			return m, nil
 		}
-		m.busy, m.busyLabel = true, "загружаю стэш..."
+		m.busy, m.busyLabel = true, i18n.T.LoadingStashBusy
 		return m, tea.Batch(stashListCmd(m.repo), m.spinner.Tick)
 	case "S":
 		// быстрый pop последнего стэша прямо с главного экрана, без открытия
@@ -411,25 +412,25 @@ func (m mainModel) handleNormalKey(msg tea.KeyMsg) (mainModel, tea.Cmd) {
 		if m.repo == nil {
 			return m, nil
 		}
-		m.busy, m.busyLabel = true, "достаю файлы из стэша..."
+		m.busy, m.busyLabel = true, i18n.T.PoppingStashBusy
 		return m, tea.Batch(stashPopCmd(m.repo, ""), m.spinner.Tick)
 	case "p":
 		if m.repo == nil {
 			return m, nil
 		}
-		m.busy, m.busyLabel = true, "push..."
+		m.busy, m.busyLabel = true, i18n.T.PushingBusy
 		return m, tea.Batch(pushCmd(m.repo, m.ghToken), m.spinner.Tick)
 	case "P":
 		if m.repo == nil {
 			return m, nil
 		}
-		m.busy, m.busyLabel = true, "pull..."
+		m.busy, m.busyLabel = true, i18n.T.PullingBusy
 		return m, tea.Batch(pullCmd(m.repo, m.ghToken), m.spinner.Tick)
 	case "f":
 		if m.repo == nil {
 			return m, nil
 		}
-		m.busy, m.busyLabel = true, "fetch..."
+		m.busy, m.busyLabel = true, i18n.T.FetchingBusy
 		return m, tea.Batch(fetchCmd(m.repo, m.ghToken), m.spinner.Tick)
 	}
 	return m, nil
@@ -493,7 +494,7 @@ func (m mainModel) toggleStage() (mainModel, tea.Cmd) {
 		err = m.repo.StageFile(f.Path)
 	}
 	if err != nil {
-		m.status, m.statusErr = "не удалось изменить индекс: "+err.Error(), true
+		m.status, m.statusErr = i18n.T.StageChangeFailedPrefix+err.Error(), true
 		return m, nil
 	}
 	m.status = ""
@@ -510,7 +511,7 @@ func (m mainModel) enterAction() (mainModel, tea.Cmd) {
 		if target == m.branch {
 			return m, nil
 		}
-		m.busy, m.busyLabel = true, "переключаю ветку..."
+		m.busy, m.busyLabel = true, i18n.T.SwitchingBranchBusy
 		return m, tea.Batch(checkoutCmd(m.repo, target), m.spinner.Tick)
 	case focusFiles:
 		return m.toggleStage()
@@ -530,7 +531,7 @@ func (m mainModel) openCommitModal() (mainModel, tea.Cmd) {
 		}
 	}
 	if !hasStaged {
-		m.status, m.statusErr = "нечего коммитить — застейджите файлы (space)", true
+		m.status, m.statusErr = i18n.T.NothingToCommitErr, true
 		return m, nil
 	}
 	m.mode = modeCommitMsg
@@ -548,12 +549,12 @@ func (m mainModel) handleCommitKey(msg tea.KeyMsg) (mainModel, tea.Cmd) {
 	case tea.KeyEnter:
 		message := strings.TrimSpace(m.commitInput.Value())
 		if message == "" {
-			m.status, m.statusErr = "введите сообщение коммита", true
+			m.status, m.statusErr = i18n.T.EnterCommitMessageErr, true
 			return m, nil
 		}
 		m.mode = modeNormal
 		m.commitInput.Blur()
-		m.busy, m.busyLabel = true, "коммичу..."
+		m.busy, m.busyLabel = true, i18n.T.CommittingBusy
 		return m, tea.Batch(commitCmd(m.repo, message), m.spinner.Tick)
 	}
 	var cmd tea.Cmd
@@ -596,14 +597,14 @@ func (m mainModel) handleBranchSwitchKey(msg tea.KeyMsg) (mainModel, tea.Cmd) {
 			if target == m.branch {
 				return m, nil
 			}
-			m.busy, m.busyLabel = true, "переключаю ветку..."
+			m.busy, m.busyLabel = true, i18n.T.SwitchingBranchBusy
 			return m, tea.Batch(checkoutCmd(m.repo, target), m.spinner.Tick)
 		}
 		name := strings.TrimSpace(m.branchFilter.Value())
 		if name == "" {
 			return m, nil
 		}
-		m.busy, m.busyLabel = true, "создаю ветку..."
+		m.busy, m.busyLabel = true, i18n.T.CreatingBranchBusy
 		return m, tea.Batch(createBranchCmd(m.repo, name), m.spinner.Tick)
 	}
 	var cmd tea.Cmd
@@ -636,7 +637,7 @@ func (m mainModel) handleDoctorConfirmKey(msg tea.KeyMsg) (mainModel, tea.Cmd) {
 			return m, nil
 		}
 		issue := m.doctorIssues[m.doctorCursor]
-		m.busy, m.busyLabel = true, "исправляю..."
+		m.busy, m.busyLabel = true, i18n.T.FixingBusy
 		return m, tea.Batch(doctorFixCmd(m.repo, issue), m.spinner.Tick)
 	case "n", "esc":
 		m.mode = modeDoctorList
@@ -673,7 +674,7 @@ func (m mainModel) handleStashListKey(msg tea.KeyMsg) (mainModel, tea.Cmd) {
 		if m.repo == nil {
 			return m, nil
 		}
-		m.busy, m.busyLabel = true, "прячу изменения в стэш..."
+		m.busy, m.busyLabel = true, i18n.T.StashingBusy
 		return m, tea.Batch(stashPushCmd(m.repo), m.spinner.Tick)
 	case "enter", "p":
 		if m.stashCursor >= len(m.stashes) {
@@ -681,7 +682,7 @@ func (m mainModel) handleStashListKey(msg tea.KeyMsg) (mainModel, tea.Cmd) {
 		}
 		ref := m.stashes[m.stashCursor].Ref
 		m.mode = modeNormal
-		m.busy, m.busyLabel = true, "достаю файлы из стэша..."
+		m.busy, m.busyLabel = true, i18n.T.PoppingStashBusy
 		return m, tea.Batch(stashPopCmd(m.repo, ref), m.spinner.Tick)
 	case "a":
 		if m.stashCursor >= len(m.stashes) {
@@ -689,7 +690,7 @@ func (m mainModel) handleStashListKey(msg tea.KeyMsg) (mainModel, tea.Cmd) {
 		}
 		ref := m.stashes[m.stashCursor].Ref
 		m.mode = modeNormal
-		m.busy, m.busyLabel = true, "применяю стэш..."
+		m.busy, m.busyLabel = true, i18n.T.ApplyingStashBusy
 		return m, tea.Batch(stashApplyCmd(m.repo, ref), m.spinner.Tick)
 	case "x":
 		if m.stashCursor < len(m.stashes) {
@@ -708,7 +709,7 @@ func (m mainModel) handleStashConfirmDropKey(msg tea.KeyMsg) (mainModel, tea.Cmd
 		}
 		ref := m.stashes[m.stashCursor].Ref
 		m.mode = modeNormal
-		m.busy, m.busyLabel = true, "удаляю стэш..."
+		m.busy, m.busyLabel = true, i18n.T.DroppingStashBusy
 		return m, tea.Batch(stashDropCmd(m.repo, ref), m.spinner.Tick)
 	case "n", "esc":
 		m.mode = modeStashList
@@ -760,13 +761,13 @@ func (m mainModel) renderTopBar() string {
 	if m.ahead > 0 || m.behind > 0 {
 		aheadBehind = fmt.Sprintf(" ↑%d ↓%d", m.ahead, m.behind)
 	}
-	ghStatus := helpStyle.Render("GitHub: не подключён (g — войти)")
+	ghStatus := helpStyle.Render(i18n.T.GitHubNotConnected)
 	if m.ghUser != nil {
 		label := m.ghUser.Login
 		if m.ghUser.Name != "" {
 			label = fmt.Sprintf("%s (@%s)", m.ghUser.Name, m.ghUser.Login)
 		}
-		ghStatus = okStyle.Render("GitHub: " + label)
+		ghStatus = okStyle.Render(i18n.T.GitHubConnectedPrefix + label)
 	}
 	line := titleStyle.Render("tgit") + "   " + helpStyle.Render("⎇ "+branchLabel+aheadBehind) + "   " + ghStatus
 	if m.err != "" {
@@ -780,7 +781,7 @@ func (m mainModel) renderBranchesPanel(w, h int) string {
 	innerW := maxInt(w-2, 1)  // w — content-ширина; 1 колонка padding с каждой стороны
 	var lines []string
 	if len(m.branches) == 0 {
-		lines = append(lines, helpStyle.Render("нет данных"))
+		lines = append(lines, helpStyle.Render(i18n.T.NoDataMsg))
 	} else {
 		start, end := visibleWindow(m.branchCursor, len(m.branches), maxRows)
 		for i := start; i < end; i++ {
@@ -797,7 +798,7 @@ func (m mainModel) renderBranchesPanel(w, h int) string {
 			lines = append(lines, style.Render(text))
 		}
 	}
-	title := titleStyle.Render("Ветки")
+	title := titleStyle.Render(i18n.T.PanelBranchesTitle)
 	return panelStyleFor(m.focus == focusBranches).Width(w).Height(h).Render(title + "\n" + strings.Join(lines, "\n"))
 }
 
@@ -806,7 +807,7 @@ func (m mainModel) renderFilesPanel(w, h int) string {
 	innerW := maxInt(w-2, 1)  // w — content-ширина; 1 колонка padding с каждой стороны
 	var lines []string
 	if len(m.files) == 0 {
-		lines = append(lines, okStyle.Render("чисто"))
+		lines = append(lines, okStyle.Render(i18n.T.CleanMsg))
 	} else {
 		start, end := visibleWindow(m.fileCursor, len(m.files), maxRows)
 		for i := start; i < end; i++ {
@@ -823,7 +824,7 @@ func (m mainModel) renderFilesPanel(w, h int) string {
 			lines = append(lines, style.Render(text))
 		}
 	}
-	title := titleStyle.Render(fmt.Sprintf("Файлы (%d)", len(m.files)))
+	title := titleStyle.Render(fmt.Sprintf(i18n.T.PanelFilesTitleFmt, len(m.files)))
 	return panelStyleFor(m.focus == focusFiles).Width(w).Height(h).Render(title + "\n" + strings.Join(lines, "\n"))
 }
 
@@ -843,7 +844,7 @@ func (m mainModel) renderLogPanel(w, h int) string {
 	innerW := maxInt(w-2, 1)  // w — content-ширина; 1 колонка padding с каждой стороны
 	var lines []string
 	if len(m.commits) == 0 {
-		lines = append(lines, helpStyle.Render("нет коммитов"))
+		lines = append(lines, helpStyle.Render(i18n.T.NoCommitsMsg))
 	} else {
 		start, end := visibleWindow(m.commitCursor, len(m.commits), maxRows)
 		for i := start; i < end; i++ {
@@ -856,7 +857,7 @@ func (m mainModel) renderLogPanel(w, h int) string {
 			lines = append(lines, style.Render(text))
 		}
 	}
-	title := titleStyle.Render("Лог")
+	title := titleStyle.Render(i18n.T.PanelLogTitle)
 	return panelStyleFor(m.focus == focusLog).Width(w).Height(h).Render(title + "\n" + strings.Join(lines, "\n"))
 }
 
@@ -865,7 +866,7 @@ func (m mainModel) renderDiffPanel(w, h int) string {
 	innerW := maxInt(w-2, 1)  // w — content-ширина; 1 колонка padding с каждой стороны
 	content := m.diff
 	if content == "" {
-		content = helpStyle.Render("выберите файл или коммит")
+		content = helpStyle.Render(i18n.T.SelectFileOrCommitMsg)
 	}
 	lines := strings.Split(content, "\n")
 	scroll := clamp(m.diffScroll, 0, maxInt(len(lines)-maxRows, 0))
@@ -877,7 +878,7 @@ func (m mainModel) renderDiffPanel(w, h int) string {
 	for _, l := range lines[scroll:end] {
 		out = append(out, styleDiffLine(truncateLine(l, innerW)))
 	}
-	title := titleStyle.Render("Diff")
+	title := titleStyle.Render(i18n.T.PanelDiffTitle)
 	return panelStyleFor(m.focus == focusDiff).Width(w).Height(h).Render(title + "\n" + strings.Join(out, "\n"))
 }
 
@@ -910,7 +911,7 @@ func (m mainModel) renderStatusLine() string {
 		return titleStyle.Render(m.spinner.View()) + " " + helpStyle.Render(m.busyLabel)
 	}
 	if m.status == "" {
-		return helpStyle.Render("tab — след. панель  •  ↑/↓ — навигация  •  space/enter — стейдж/чекаут  •  y — копировать хеш  •  ctrl+c — выйти")
+		return helpStyle.Render(i18n.T.StatusHelpMsg)
 	}
 	style := okStyle
 	if m.statusErr {
@@ -927,25 +928,25 @@ func (m mainModel) viewCommitModal() string {
 		}
 	}
 	var b strings.Builder
-	b.WriteString(titleStyle.Render("Новый коммит") + "\n\n")
-	b.WriteString(helpStyle.Render(fmt.Sprintf("Застейджено файлов: %d", staged)) + "\n\n")
-	b.WriteString("Сообщение: " + m.commitInput.View() + "\n\n")
-	b.WriteString(helpStyle.Render("enter — закоммитить  •  esc — отмена"))
+	b.WriteString(titleStyle.Render(i18n.T.NewCommitTitle) + "\n\n")
+	b.WriteString(helpStyle.Render(fmt.Sprintf(i18n.T.StagedFilesFmt, staged)) + "\n\n")
+	b.WriteString(i18n.T.MessageLabel + m.commitInput.View() + "\n\n")
+	b.WriteString(helpStyle.Render(i18n.T.CommitModalHelp))
 	return lipgloss.NewStyle().Padding(1, 2).Render(b.String())
 }
 
 func (m mainModel) viewBranchSwitchModal() string {
 	var b strings.Builder
-	b.WriteString(titleStyle.Render("Переключить / создать ветку") + "\n\n")
-	b.WriteString("Фильтр: " + m.branchFilter.View() + "\n\n")
+	b.WriteString(titleStyle.Render(i18n.T.SwitchBranchTitle) + "\n\n")
+	b.WriteString(i18n.T.FilterLabel + m.branchFilter.View() + "\n\n")
 
 	matches := m.filteredBranches()
 	if len(matches) == 0 {
 		q := strings.TrimSpace(m.branchFilter.Value())
 		if q == "" {
-			b.WriteString(helpStyle.Render("нет веток"))
+			b.WriteString(helpStyle.Render(i18n.T.NoBranchesMsg))
 		} else {
-			b.WriteString(helpStyle.Render("совпадений нет — enter создаст новую ветку «" + q + "»"))
+			b.WriteString(helpStyle.Render(fmt.Sprintf(i18n.T.NoMatchesCreateFmt, q)))
 		}
 	} else {
 		for i, br := range matches {
@@ -960,19 +961,19 @@ func (m mainModel) viewBranchSwitchModal() string {
 			b.WriteString(style.Render(prefix+br) + "\n")
 		}
 	}
-	b.WriteString("\n" + helpStyle.Render("enter — выбрать/создать  •  esc — отмена"))
+	b.WriteString("\n" + helpStyle.Render(i18n.T.BranchModalHelp))
 	return lipgloss.NewStyle().Padding(1, 2).Render(b.String())
 }
 
 func (m mainModel) viewDoctorModal() string {
 	var b strings.Builder
 	if len(m.doctorIssues) == 0 {
-		b.WriteString(okStyle.Render("✓ Проблем не найдено") + "\n\n")
-		b.WriteString(helpStyle.Render("esc — закрыть"))
+		b.WriteString(okStyle.Render(i18n.T.NoIssuesFoundMsg) + "\n\n")
+		b.WriteString(helpStyle.Render(i18n.T.CloseHelp))
 		return lipgloss.NewStyle().Padding(1, 2).Render(b.String())
 	}
 
-	b.WriteString(errorStyle.Render(fmt.Sprintf("⚠ Найдено проблем: %d", len(m.doctorIssues))) + "\n\n")
+	b.WriteString(errorStyle.Render(fmt.Sprintf(i18n.T.IssuesFoundFmt, len(m.doctorIssues))) + "\n\n")
 	// Каждая проблема — ровно одна строка (без вставок под курсором): так
 	// строки кликабельны мышью по фиксированному номеру, деталь курсора — ниже.
 	for i, issue := range m.doctorIssues {
@@ -990,21 +991,21 @@ func (m mainModel) viewDoctorModal() string {
 
 	b.WriteString("\n")
 	if m.mode == modeDoctorConfirm {
-		b.WriteString(errorStyle.Render("Исправить эту проблему? (может удалить файлы / изменить .gitignore)") + "\n")
-		b.WriteString(helpStyle.Render("y — да  •  n/esc — отмена"))
+		b.WriteString(errorStyle.Render(i18n.T.FixConfirmMsg) + "\n")
+		b.WriteString(helpStyle.Render(i18n.T.YesNoHelp))
 	} else {
-		b.WriteString(helpStyle.Render("↑/↓ — выбрать  •  enter — исправить  •  esc — закрыть"))
+		b.WriteString(helpStyle.Render(i18n.T.DoctorListHelp))
 	}
 	return lipgloss.NewStyle().Padding(1, 2).Render(b.String())
 }
 
 func (m mainModel) viewStashModal() string {
 	var b strings.Builder
-	b.WriteString(titleStyle.Render("Стэш") + "\n\n")
+	b.WriteString(titleStyle.Render(i18n.T.StashTitle) + "\n\n")
 
 	if len(m.stashes) == 0 {
-		b.WriteString(helpStyle.Render("стэш пуст") + "\n\n")
-		b.WriteString(helpStyle.Render("n — спрятать текущие изменения в стэш  •  esc — закрыть"))
+		b.WriteString(helpStyle.Render(i18n.T.StashEmptyMsg) + "\n\n")
+		b.WriteString(helpStyle.Render(i18n.T.StashEmptyHelp))
 		return lipgloss.NewStyle().Padding(1, 2).Render(b.String())
 	}
 
@@ -1018,7 +1019,7 @@ func (m mainModel) viewStashModal() string {
 	}
 
 	if m.stashDetail != "" {
-		b.WriteString("\n" + helpStyle.Render("Изменённые файлы:") + "\n")
+		b.WriteString("\n" + helpStyle.Render(i18n.T.StashChangedFilesLabel) + "\n")
 		for _, l := range strings.Split(strings.TrimRight(m.stashDetail, "\n"), "\n") {
 			b.WriteString(helpStyle.Render("  "+truncateLine(l, 100)) + "\n")
 		}
@@ -1026,10 +1027,10 @@ func (m mainModel) viewStashModal() string {
 
 	b.WriteString("\n")
 	if m.mode == modeStashConfirmDrop {
-		b.WriteString(errorStyle.Render("Удалить этот стэш без применения? Изменения будут потеряны безвозвратно.") + "\n")
-		b.WriteString(helpStyle.Render("y — да  •  n/esc — отмена"))
+		b.WriteString(errorStyle.Render(i18n.T.StashDropConfirmMsg) + "\n")
+		b.WriteString(helpStyle.Render(i18n.T.YesNoHelp))
 	} else {
-		b.WriteString(helpStyle.Render("↑/↓ — выбрать  •  enter/p — pop (достать и удалить)  •  a — apply (достать, оставить в стэше)  •  x — drop (удалить)  •  n — новый стэш  •  esc — закрыть"))
+		b.WriteString(helpStyle.Render(i18n.T.StashListHelp))
 	}
 	return lipgloss.NewStyle().Padding(1, 2).Render(b.String())
 }
@@ -1053,9 +1054,22 @@ func maxInt(a, b int) int {
 	return b
 }
 
+// tabWidth — во сколько пробелов раскрывается символ табуляции перед обрезкой
+// строки. Раскрытие обязательно: без него табы (частые в diff'ах кода,
+// например Go-исходников с табовой отступной) считаются truncateLine как одна
+// руна, но терминал рисует их шире одной колонки — строка "влезает" по счёту
+// рун, но не по факту, переносится на следующую строку терминала и раздувает
+// высоту всей панели (а с ней и всего окна — см. lipgloss.Height в
+// renderDiffPanel и его соседях, которые полагаются на то, что содержимое
+// укладывается ровно в отведённое число строк).
+const tabWidth = 4
+
 func truncateLine(s string, max int) string {
 	if max <= 0 {
 		return ""
+	}
+	if strings.ContainsRune(s, '\t') {
+		s = strings.ReplaceAll(s, "\t", strings.Repeat(" ", tabWidth))
 	}
 	r := []rune(s)
 	if len(r) <= max {

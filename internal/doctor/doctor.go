@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"tgit/internal/gitrepo"
+	"tgit/internal/i18n"
 )
 
 // Issue — одна найденная проблема с готовым действием для исправления.
@@ -46,7 +47,7 @@ func Scan(repo *gitrepo.Repo) ([]Issue, error) {
 	if len(junk) > 0 {
 		files := junk
 		issues = append(issues, Issue{
-			Title:  fmt.Sprintf("Файлы macOS (._*, .DS_Store) в репозитории: %d шт.", len(files)),
+			Title:  fmt.Sprintf(i18n.T.MacJunkTitleFmt, len(files)),
 			Detail: strings.Join(files, ", "),
 			fix: func(r *gitrepo.Repo) error {
 				return fixMacJunk(r, files)
@@ -61,7 +62,7 @@ func Scan(repo *gitrepo.Repo) ([]Issue, error) {
 	if len(dirs) > 0 {
 		found := dirs
 		issues = append(issues, Issue{
-			Title:  fmt.Sprintf("Служебные каталоги не в .gitignore: %d шт.", len(found)),
+			Title:  fmt.Sprintf(i18n.T.JunkDirsTitleFmt, len(found)),
 			Detail: strings.Join(found, ", "),
 			fix: func(r *gitrepo.Repo) error {
 				return ensureGitignorePatterns(r.Root, found)

@@ -11,6 +11,7 @@ import (
 	"github.com/charmbracelet/lipgloss"
 
 	"tgit/internal/ghauth"
+	"tgit/internal/i18n"
 	"tgit/internal/openurl"
 )
 
@@ -87,7 +88,7 @@ func (m loginModel) Update(msg tea.Msg) (loginModel, tea.Cmd) {
 			}
 			token := m.tokenValue()
 			if token == "" {
-				m.errMsg = "вставьте токен перед входом"
+				m.errMsg = i18n.T.LoginEmptyTokenErr
 				return m, nil
 			}
 			m.checking = true
@@ -107,21 +108,21 @@ func (m loginModel) Update(msg tea.Msg) (loginModel, tea.Cmd) {
 func (m loginModel) View() string {
 	var b strings.Builder
 
-	b.WriteString(titleStyle.Render("tgit — вход через GitHub") + "\n\n")
-	b.WriteString("Нужен Personal Access Token с правом " + lipgloss.NewStyle().Bold(true).Render("repo") + ".\n")
-	b.WriteString("Создать токен: " + linkStyle.Render(Hyperlink(ghauth.TokenCreateURL, ghauth.TokenCreateURL)) + "\n")
-	b.WriteString(helpStyle.Render("ctrl+o — открыть эту ссылку в браузере автоматически") + "\n\n")
+	b.WriteString(titleStyle.Render(i18n.T.LoginTitle) + "\n\n")
+	b.WriteString(i18n.T.LoginNeedTokenPrefix + lipgloss.NewStyle().Bold(true).Render("repo") + i18n.T.LoginNeedTokenSuffix)
+	b.WriteString(i18n.T.LoginCreateTokenLabel + linkStyle.Render(Hyperlink(ghauth.TokenCreateURL, ghauth.TokenCreateURL)) + "\n")
+	b.WriteString(helpStyle.Render(i18n.T.LoginCtrlOHint) + "\n\n")
 
-	b.WriteString("Токен: " + m.input.View() + "\n\n")
+	b.WriteString(i18n.T.LoginTokenFieldLabel + m.input.View() + "\n\n")
 
 	if m.checking {
-		b.WriteString(m.spinner.View() + " проверяю токен на GitHub...\n")
+		b.WriteString(m.spinner.View() + " " + i18n.T.LoginChecking + "\n")
 	}
 	if m.errMsg != "" {
 		b.WriteString(errorStyle.Render("✗ "+m.errMsg) + "\n")
 	}
 
-	b.WriteString("\n" + helpStyle.Render("enter — войти  •  esc — пропустить и работать локально  •  ctrl+c — выйти"))
+	b.WriteString("\n" + helpStyle.Render(i18n.T.LoginHelp))
 
 	return lipgloss.NewStyle().Padding(1, 2).Render(b.String())
 }

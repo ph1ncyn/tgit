@@ -19,7 +19,7 @@ func Open(url string) error {
 	case "linux":
 		cmd = exec.Command("xdg-open", url)
 	default:
-		return fmt.Errorf("не знаю, как открыть браузер на %s", runtime.GOOS)
+		return fmt.Errorf("don't know how to open a browser on %s", runtime.GOOS)
 	}
 	return cmd.Start()
 }

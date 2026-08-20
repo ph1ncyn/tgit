@@ -13,6 +13,8 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+
+	"tgit/internal/i18n"
 )
 
 // FileStatus — одна строка `git status --porcelain`.
@@ -49,7 +51,7 @@ type Repo struct {
 func Open(dir string) (*Repo, error) {
 	out, err := runGit(dir, "rev-parse", "--show-toplevel")
 	if err != nil {
-		return nil, fmt.Errorf("не git-репозиторий: %w", err)
+		return nil, fmt.Errorf(i18n.T.NotGitRepoFmt, err)
 	}
 	return &Repo{Root: strings.TrimSpace(out)}, nil
 }
@@ -63,7 +65,7 @@ func Clone(url, dir string) (*Repo, error) {
 		return nil, err
 	}
 	if _, err := runGitCombined(dir, "clone", url, "."); err != nil {
-		return nil, fmt.Errorf("клонирование не удалось: %s", err)
+		return nil, fmt.Errorf(i18n.T.CloneFailedFmt, err)
 	}
 	return Open(dir)
 }
@@ -131,7 +133,7 @@ func (r *Repo) AheadBehind() (ahead, behind int, err error) {
 	}
 	parts := strings.Fields(out)
 	if len(parts) != 2 {
-		return 0, 0, fmt.Errorf("неожиданный вывод git rev-list")
+		return 0, 0, fmt.Errorf("%s", i18n.T.UnexpectedRevListMsg)
 	}
 	ahead, _ = strconv.Atoi(parts[0])
 	behind, _ = strconv.Atoi(parts[1])
@@ -252,12 +254,12 @@ func (r *Repo) untrackedPreview(path string) (string, error) {
 
 	for _, b := range buf {
 		if b == 0 {
-			return "(бинарный файл, предпросмотр недоступен)", nil
+			return i18n.T.BinaryPreviewMsg, nil
 		}
 	}
 	suffix := ""
 	if n == maxBytes {
-		suffix = "\n… (обрезано)"
+		suffix = i18n.T.TruncatedSuffixMsg
 	}
 	return string(buf) + suffix, nil
 }

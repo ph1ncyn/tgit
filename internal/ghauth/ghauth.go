@@ -8,6 +8,8 @@ import (
 	"fmt"
 	"net/http"
 	"time"
+
+	"tgit/internal/i18n"
 )
 
 // TokenCreateURL сразу открывает форму создания classic-токена на GitHub
@@ -35,21 +37,21 @@ func ValidateToken(ctx context.Context, token string) (*User, error) {
 
 	resp, err := httpClient.Do(req)
 	if err != nil {
-		return nil, fmt.Errorf("сеть: %w", err)
+		return nil, fmt.Errorf(i18n.T.NetworkErrFmt, err)
 	}
 	defer resp.Body.Close()
 
 	switch resp.StatusCode {
 	case http.StatusOK:
 	case http.StatusUnauthorized:
-		return nil, fmt.Errorf("GitHub отклонил токен (401) — проверьте, что он не истёк и скопирован полностью")
+		return nil, fmt.Errorf("%s", i18n.T.TokenRejectedMsg)
 	default:
-		return nil, fmt.Errorf("GitHub вернул статус %d", resp.StatusCode)
+		return nil, fmt.Errorf(i18n.T.UnexpectedStatusFmt, resp.StatusCode)
 	}
 
 	var u User
 	if err := json.NewDecoder(resp.Body).Decode(&u); err != nil {
-		return nil, fmt.Errorf("не удалось разобрать ответ GitHub: %w", err)
+		return nil, fmt.Errorf(i18n.T.ParseFailedFmt, err)
 	}
 	return &u, nil
 }
