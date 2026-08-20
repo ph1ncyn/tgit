@@ -4,6 +4,7 @@
 </div>
 
 <img width="916,5" height="515" alt="screenshot" src="https://github.com/user-attachments/assets/9a39c952-4c0b-427e-b9a7-7a957926b37c" />
+<img width="916,5" height="515" alt="screenshot" src="https://github.com/user-attachments/assets/b4c48968-2e2f-4cb2-bc26-9b765bcf0aff" />
 
 
 A convenient, feature-rich git terminal (TUI) with mouse support, GitHub-token sign-in,
