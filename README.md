@@ -1,5 +1,5 @@
 <div align="center">
-<img width="128" height="128" alt="logo_tgit" src="https://github.com/user-attachments/assets/822d5bf3-2006-4cee-9149-5df54688caf5"/>
+<img width="128" height="128" alt="logo_tgit" src="logo_tgit.png"/>
 <h1>tgit</h1>
 </div>
 
