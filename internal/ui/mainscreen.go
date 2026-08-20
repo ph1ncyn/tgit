@@ -898,12 +898,19 @@ func styleDiffLine(l string) string {
 }
 
 func (m mainModel) renderToolbar() string {
-	buttons := toolbarButtons()
-	labels := make([]string, len(buttons))
+	buttons := toolbarButtons(m.ahead, m.behind)
+	segments := make([]string, len(buttons))
 	for i, b := range buttons {
-		labels[i] = b.label
+		style := helpStyle
+		// Push/Pull получили бейдж с числом коммитов (см. toolbarButtons) —
+		// подсвечиваем саму кнопку акцентным цветом, чтобы было видно без
+		// чтения текста, а не только по цифре в подписи.
+		if (b.key == "p" && m.ahead > 0) || (b.key == "P" && m.behind > 0) {
+			style = titleStyle
+		}
+		segments[i] = style.Render(b.label)
 	}
-	return helpStyle.Render(strings.Join(labels, "   "))
+	return strings.Join(segments, helpStyle.Render("   "))
 }
 
 func (m mainModel) renderStatusLine() string {

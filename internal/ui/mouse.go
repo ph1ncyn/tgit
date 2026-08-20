@@ -1,6 +1,10 @@
 package ui
 
-import tea "github.com/charmbracelet/bubbletea"
+import (
+	"fmt"
+
+	tea "github.com/charmbracelet/bubbletea"
+)
 
 // toolbarButton связывает подпись кнопки с клавишей, которую она эмулирует —
 // клик по кнопке проигрывает то же самое событие клавиатуры, так что вся
@@ -10,11 +14,25 @@ type toolbarButton struct {
 	key   string
 }
 
-func toolbarButtons() []toolbarButton {
+// toolbarButtons строит список кнопок тулбара для текущего ahead/behind —
+// у Push и Pull появляется бейдж с числом непроталкнутых/непритянутых
+// коммитов (по образцу бейджа "Doctor⚠N" из INTERFACE.md), когда есть что
+// push'ить или pull'ить. И рендер (renderToolbar), и хит-тест клика мыши
+// (toolbarHit) строят кнопки через эту же функцию с одним и тем же
+// ahead/behind, поэтому подписи на экране и зоны клика никогда не расходятся.
+func toolbarButtons(ahead, behind int) []toolbarButton {
+	pushLabel := "[p] Push"
+	if ahead > 0 {
+		pushLabel = fmt.Sprintf("[p] Push↑%d", ahead)
+	}
+	pullLabel := "[P] Pull"
+	if behind > 0 {
+		pullLabel = fmt.Sprintf("[P] Pull↓%d", behind)
+	}
 	return []toolbarButton{
 		{"[c] Commit", "c"},
-		{"[p] Push", "p"},
-		{"[P] Pull", "P"},
+		{pushLabel, "p"},
+		{pullLabel, "P"},
 		{"[f] Fetch", "f"},
 		{"[b] Branch", "b"},
 		{"[s] Stash", "s"},
@@ -24,8 +42,10 @@ func toolbarButtons() []toolbarButton {
 }
 
 // toolbarHit определяет, на какую кнопку тулбара пришёлся клик по колонке x
-// в строке toolbarRow.
-func toolbarHit(x, toolbarRow, clickY int) (string, bool) {
+// в строке toolbarRow. buttons должен быть построен с тем же ahead/behind,
+// что и рендер тулбара на экране (см. toolbarButtons) — иначе зоны клика
+// разъедутся с подписями, если у Push/Pull появился бейдж.
+func toolbarHit(buttons []toolbarButton, x, toolbarRow, clickY int) (string, bool) {
 	if clickY != toolbarRow {
 		return "", false
 	}
@@ -34,7 +54,7 @@ func toolbarHit(x, toolbarRow, clickY int) (string, bool) {
 	if col < 0 {
 		return "", false
 	}
-	for _, b := range toolbarButtons() {
+	for _, b := range buttons {
 		w := len([]rune(b.label))
 		if col < w {
 			return b.key, true
@@ -79,7 +99,7 @@ func (m mainModel) handleNormalMouse(msg tea.MouseMsg) (mainModel, tea.Cmd) {
 
 	layout := computeNormalLayout(m.width, m.height, m.err != "")
 
-	if key, ok := toolbarHit(msg.X, layout.toolbarRow, msg.Y); ok {
+	if key, ok := toolbarHit(toolbarButtons(m.ahead, m.behind), msg.X, layout.toolbarRow, msg.Y); ok {
 		return m.handleNormalKey(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune(key)})
 	}
 
