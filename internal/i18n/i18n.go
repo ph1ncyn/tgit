@@ -29,6 +29,30 @@ func Set(lang Lang) {
 	}
 }
 
+// Code returns the short code used to persist lang to disk (see
+// internal/config.SaveLanguage).
+func (l Lang) Code() string {
+	switch l {
+	case Russian:
+		return "ru"
+	default:
+		return "en"
+	}
+}
+
+// ParseCode parses a code previously produced by Lang.Code. ok is false for
+// any unrecognized code, e.g. a settings file from a future tgit version.
+func ParseCode(code string) (lang Lang, ok bool) {
+	switch code {
+	case "en":
+		return English, true
+	case "ru":
+		return Russian, true
+	default:
+		return English, false
+	}
+}
+
 // Messages is the full set of user-facing strings tgit shows, in one
 // language. Fields ending in Fmt are fmt format strings (Sprintf/Errorf).
 type Messages struct {
