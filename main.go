@@ -6,6 +6,7 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 
+	"tgit/internal/config"
 	"tgit/internal/gitrepo"
 	"tgit/internal/ui"
 )
@@ -26,11 +27,15 @@ func main() {
 		os.Exit(1)
 	}
 
-	// Ошибка "не git-репозиторий" не фатальна: показываем интерфейс всё равно,
-	// главный экран сообщит об этом сам (полезно, например, только для GitHub-входа).
+	// Ошибка "не git-репозиторий" не фатальна: показываем интерфейс всё равно —
+	// вместо главного экрана появится экран с предложением открыть недавний
+	// проект tgit или склонировать репозиторий сюда (см. internal/ui.noRepoModel).
 	repo, _ := gitrepo.Open(wd)
+	if repo != nil {
+		_ = config.AddRecent(repo.Root)
+	}
 
-	app := ui.NewApp(repo)
+	app := ui.NewApp(repo, wd)
 
 	p := tea.NewProgram(app, tea.WithAltScreen(), tea.WithMouseCellMotion())
 	if _, err := p.Run(); err != nil {

@@ -13,13 +13,16 @@ const (
 	stateCheckingToken screenState = iota
 	stateLogin
 	stateMain
+	stateNoRepo
 )
 
-// App — корневая модель Bubble Tea, переключающая экран входа и главный экран.
+// App — корневая модель Bubble Tea, переключающая экран входа, главный экран
+// и экран "репозиторий не найден".
 type App struct {
-	state screenState
-	login loginModel
-	main  mainModel
+	state  screenState
+	login  loginModel
+	main   mainModel
+	noRepo noRepoModel
 
 	pendingToken  string
 	width, height int
@@ -27,11 +30,14 @@ type App struct {
 
 // NewApp собирает приложение. Если в системном хранилище уже есть токен,
 // приложение тихо проверит его перед показом главного экрана; если токена
-// нет — сразу показывает экран входа со ссылкой на создание токена.
-func NewApp(repo *gitrepo.Repo) App {
+// нет — сразу показывает экран входа со ссылкой на создание токена. Если repo
+// не открылся (текущая папка — не git-репозиторий), после экрана входа
+// показывается не главный экран, а stateNoRepo.
+func NewApp(repo *gitrepo.Repo, cwd string) App {
 	a := App{
-		login: newLoginModel(),
-		main:  newMainModel(repo),
+		login:  newLoginModel(),
+		main:   newMainModel(repo),
+		noRepo: newNoRepoModel(cwd),
 	}
 	if tok, err := secret.Load(); err == nil && tok != "" {
 		a.state = stateCheckingToken
@@ -43,8 +49,18 @@ func NewApp(repo *gitrepo.Repo) App {
 	return a
 }
 
+// afterAuthState — какой экран показать после того, как экран входа
+// (пройденный или пропущенный) закрывается: главный, если репозиторий открыт,
+// иначе экран "репозиторий не найден".
+func (a App) afterAuthState() screenState {
+	if a.main.repo == nil {
+		return stateNoRepo
+	}
+	return stateMain
+}
+
 func (a App) Init() tea.Cmd {
-	cmds := []tea.Cmd{a.main.Init()}
+	cmds := []tea.Cmd{a.main.Init(), a.noRepo.Init()}
 	switch a.state {
 	case stateCheckingToken:
 		cmds = append(cmds, validateCmd(a.pendingToken), a.login.spinner.Tick)
@@ -58,10 +74,11 @@ func (a App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
 		a.width, a.height = msg.Width, msg.Height
-		var lcmd, mcmd tea.Cmd
+		var lcmd, mcmd, ncmd tea.Cmd
 		a.login, lcmd = a.login.Update(msg)
 		a.main, mcmd = a.main.Update(msg)
-		return a, tea.Batch(lcmd, mcmd)
+		a.noRepo, ncmd = a.noRepo.Update(msg)
+		return a, tea.Batch(lcmd, mcmd, ncmd)
 
 	case tea.KeyMsg:
 		if msg.Type == tea.KeyCtrlC {
@@ -70,13 +87,13 @@ func (a App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		switch a.state {
 		case stateCheckingToken:
 			if msg.Type == tea.KeyEsc {
-				a.state = stateMain
+				a.state = a.afterAuthState()
 			}
 			return a, nil
 
 		case stateLogin:
 			if msg.Type == tea.KeyEsc {
-				a.state = stateMain
+				a.state = a.afterAuthState()
 				return a, nil
 			}
 			var cmd tea.Cmd
@@ -94,6 +111,18 @@ func (a App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 			var cmd tea.Cmd
 			a.main, cmd = a.main.Update(msg)
+			return a, cmd
+
+		case stateNoRepo:
+			// как и на главном экране, 'g' — глобальный переход к логину, но
+			// не когда пользователь печатает URL для клонирования.
+			if msg.String() == "g" && !a.noRepo.IsInputActive() {
+				a.state = stateLogin
+				a.login = newLoginModel()
+				return a, a.login.Init()
+			}
+			var cmd tea.Cmd
+			a.noRepo, cmd = a.noRepo.Update(msg)
 			return a, cmd
 		}
 		return a, nil
@@ -118,14 +147,32 @@ func (a App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			_ = secret.Save(a.main.ghToken)
 		}
 		a.main.ghUser = msg.user
-		a.state = stateMain
+		a.state = a.afterAuthState()
 		return a, nil
 
+	// repoOpenedMsg приходит из stateNoRepo (открытие недавнего проекта или
+	// клонирование). При успехе пересобираем главный экран вокруг нового
+	// Repo, перенося уже полученную GitHub-авторизацию.
+	case repoOpenedMsg:
+		var ncmd tea.Cmd
+		a.noRepo, ncmd = a.noRepo.Update(msg)
+		if msg.err != nil {
+			return a, ncmd
+		}
+		newMain := newMainModel(msg.repo)
+		newMain.ghUser = a.main.ghUser
+		newMain.ghToken = a.main.ghToken
+		newMain.width, newMain.height = a.width, a.height
+		a.main = newMain
+		a.state = stateMain
+		return a, tea.Batch(ncmd, a.main.Init())
+
 	default:
-		var lcmd, mcmd tea.Cmd
+		var lcmd, mcmd, ncmd tea.Cmd
 		a.login, lcmd = a.login.Update(msg)
 		a.main, mcmd = a.main.Update(msg)
-		return a, tea.Batch(lcmd, mcmd)
+		a.noRepo, ncmd = a.noRepo.Update(msg)
+		return a, tea.Batch(lcmd, mcmd, ncmd)
 	}
 }
 
@@ -133,6 +180,8 @@ func (a App) View() string {
 	switch a.state {
 	case stateCheckingToken, stateLogin:
 		return a.login.View()
+	case stateNoRepo:
+		return a.noRepo.View()
 	default:
 		return a.main.View()
 	}

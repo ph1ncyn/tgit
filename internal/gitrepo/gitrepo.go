@@ -54,6 +54,20 @@ func Open(dir string) (*Repo, error) {
 	return &Repo{Root: strings.TrimSpace(out)}, nil
 }
 
+// Clone клонирует url в dir (текущая директория пользователя — команда
+// использует `git clone url .`, поэтому dir должен существовать и быть
+// пустым либо отсутствующим в смысле git). При успехе открывает результат
+// как обычный репозиторий.
+func Clone(url, dir string) (*Repo, error) {
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		return nil, err
+	}
+	if _, err := runGitCombined(dir, "clone", url, "."); err != nil {
+		return nil, fmt.Errorf("клонирование не удалось: %s", err)
+	}
+	return Open(dir)
+}
+
 func runGit(dir string, args ...string) (string, error) {
 	cmd := exec.Command("git", args...)
 	cmd.Dir = dir
