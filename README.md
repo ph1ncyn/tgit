@@ -1,4 +1,7 @@
-# tgit
+<div align="center">
+<img width="128" height="128" alt="logo_tgit" src="https://github.com/user-attachments/assets/822d5bf3-2006-4cee-9149-5df54688caf5"/>
+<h1>tgit</h1>
+</div>
 
 <img width="916,5" height="515" alt="изображение" src="https://github.com/user-attachments/assets/9a39c952-4c0b-427e-b9a7-7a957926b37c" />
 
