@@ -405,6 +405,14 @@ func (m mainModel) handleNormalKey(msg tea.KeyMsg) (mainModel, tea.Cmd) {
 		}
 		m.busy, m.busyLabel = true, "загружаю стэш..."
 		return m, tea.Batch(stashListCmd(m.repo), m.spinner.Tick)
+	case "S":
+		// быстрый pop последнего стэша прямо с главного экрана, без открытия
+		// панели Stash — для выбора конкретной записи/apply/drop открой 's'.
+		if m.repo == nil {
+			return m, nil
+		}
+		m.busy, m.busyLabel = true, "достаю файлы из стэша..."
+		return m, tea.Batch(stashPopCmd(m.repo, ""), m.spinner.Tick)
 	case "p":
 		if m.repo == nil {
 			return m, nil

@@ -18,6 +18,7 @@ func toolbarButtons() []toolbarButton {
 		{"[f] Fetch", "f"},
 		{"[b] Branch", "b"},
 		{"[s] Stash", "s"},
+		{"[S] Pop", "S"},
 		{"[d] Doctor", "d"},
 	}
 }
