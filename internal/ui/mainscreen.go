@@ -1,6 +1,7 @@
 package ui
 
 import (
+	"context"
 	"fmt"
 	"strings"
 	"time"
@@ -15,6 +16,7 @@ import (
 	"tgit/internal/ghauth"
 	"tgit/internal/gitrepo"
 	"tgit/internal/i18n"
+	"tgit/internal/update"
 )
 
 // autoFetchInterval — как часто в фоне обновляются remote-tracking ссылки,
@@ -62,6 +64,41 @@ func autoFetchTickCmd() tea.Cmd {
 	return tea.Tick(autoFetchInterval, func(time.Time) tea.Msg { return autoFetchTickMsg{} })
 }
 
+// updateCheckMsg — результат сравнения local_version.json с version.json из
+// ветки main на GitHub. Ошибка (например, нет сети) тихо игнорируется —
+// индикатор обновления просто не появляется, как и с autoFetch.
+type updateCheckMsg struct {
+	remote string
+	err    error
+}
+
+// updateAppliedMsg — результат применения обновления (git pull + go build +
+// подмена бинарника). При успехе exe уже содержит НОВЫЙ бинарник — его
+// нужно перезапустить после чистого выхода (см. RestartExe/handleUpdateApplied).
+type updateAppliedMsg struct {
+	version string
+	exe     string
+	err     error
+}
+
+func checkUpdateCmd() tea.Cmd {
+	return func() tea.Msg {
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cancel()
+		remote, err := update.FetchRemoteVersion(ctx)
+		return updateCheckMsg{remote: remote, err: err}
+	}
+}
+
+func applyUpdateCmd(local update.Local) tea.Cmd {
+	return func() tea.Msg {
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+		defer cancel()
+		version, exe, err := update.Apply(ctx, local)
+		return updateAppliedMsg{version: version, exe: exe, err: err}
+	}
+}
+
 type mainModel struct {
 	repo    *gitrepo.Repo
 	ghUser  *ghauth.User
@@ -102,6 +139,12 @@ type mainModel struct {
 
 	autoFetching bool
 
+	localVersion    string
+	updateSourceDir string
+	updateAvailable bool
+	updating        bool
+	restartExe      string
+
 	status    string
 	statusErr bool
 	err       string
@@ -123,7 +166,19 @@ func newMainModel(repo *gitrepo.Repo) mainModel {
 	sp.Spinner = spinner.Dot
 	sp.Style = titleStyle
 
-	return mainModel{repo: repo, commitInput: ci, branchFilter: bf, spinner: sp, focus: focusFiles}
+	m := mainModel{repo: repo, commitInput: ci, branchFilter: bf, spinner: sp, focus: focusFiles}
+	if local, ok := update.LoadLocal(); ok {
+		m.localVersion = local.Version
+		m.updateSourceDir = local.SourceDir
+	}
+	return m
+}
+
+// RestartExe — путь к бинарнику, который нужно перезапустить после чистого
+// выхода (заполняется после успешного применения обновления, см.
+// updateAppliedMsg). Пусто, если перезапуск не требуется.
+func (m mainModel) RestartExe() string {
+	return m.restartExe
 }
 
 // IsModal сообщает, активен ли сейчас поверх основного экрана диалог с
@@ -167,7 +222,11 @@ func (m mainModel) loadCmd() tea.Cmd {
 }
 
 func (m mainModel) Init() tea.Cmd {
-	return tea.Batch(m.loadCmd(), autoFetchTickCmd())
+	cmds := []tea.Cmd{m.loadCmd(), autoFetchTickCmd()}
+	if m.localVersion != "" {
+		cmds = append(cmds, checkUpdateCmd())
+	}
+	return tea.Batch(cmds...)
 }
 
 func (m mainModel) Update(msg tea.Msg) (mainModel, tea.Cmd) {
@@ -197,6 +256,25 @@ func (m mainModel) Update(msg tea.Msg) (mainModel, tea.Cmd) {
 	case autoFetchResultMsg:
 		m.autoFetching = false
 		return m, m.loadCmd()
+
+	case updateCheckMsg:
+		if msg.err == nil && update.Newer(m.localVersion, msg.remote) {
+			m.updateAvailable = true
+		}
+		return m, nil
+
+	case updateAppliedMsg:
+		m.busy = false
+		m.updating = false
+		if msg.err != nil {
+			m.status = i18n.T.UpdateFailedPrefix + msg.err.Error()
+			m.statusErr = true
+			return m, nil
+		}
+		m.updateAvailable = false
+		m.localVersion = msg.version
+		m.restartExe = msg.exe
+		return m, tea.Quit
 
 	case diffLoadedMsg:
 		if !m.diffTargetCurrent(msg.forFocus, msg.forKey) {
@@ -473,6 +551,13 @@ func (m mainModel) handleNormalKey(msg tea.KeyMsg) (mainModel, tea.Cmd) {
 		}
 		m.busy, m.busyLabel = true, i18n.T.FetchingBusy
 		return m, tea.Batch(fetchCmd(m.repo, m.ghToken), m.spinner.Tick)
+	case "u":
+		if !m.updateAvailable || m.updateSourceDir == "" {
+			return m, nil
+		}
+		m.busy, m.updating, m.busyLabel = true, true, i18n.T.UpdatingBusy
+		local := update.Local{Version: m.localVersion, SourceDir: m.updateSourceDir}
+		return m, tea.Batch(applyUpdateCmd(local), m.spinner.Tick)
 	}
 	return m, nil
 }
@@ -825,7 +910,14 @@ func (m mainModel) renderTopBar() string {
 		}
 		ghStatus = okStyle.Render(i18n.T.GitHubConnectedPrefix + label)
 	}
-	line := titleStyle.Render("tgit") + "   " + helpStyle.Render("⎇ "+branchLabel+aheadBehind) + "   " + ghStatus
+	versionLabel := ""
+	if m.localVersion != "" {
+		versionLabel = " " + helpStyle.Render(m.localVersion)
+	}
+	line := titleStyle.Render("tgit") + versionLabel + "   " + helpStyle.Render("⎇ "+branchLabel+aheadBehind) + "   " + ghStatus
+	if m.updateAvailable {
+		line += "   " + titleStyle.Render(i18n.T.UpdateAvailableLabel)
+	}
 	if m.err != "" {
 		line += "\n" + errorStyle.Render(m.err)
 	}

@@ -57,6 +57,9 @@ var en = Messages{
 	StashingBusy:            "stashing changes...",
 	ApplyingStashBusy:       "applying stash...",
 	DroppingStashBusy:       "dropping stash...",
+	UpdatingBusy:            "updating (git pull + build)...",
+	UpdateFailedPrefix:      "update failed: ",
+	UpdateAvailableLabel:    "update available (u)",
 
 	GitHubNotConnected:    "GitHub: not connected (g — sign in)",
 	GitHubConnectedPrefix: "GitHub: ",
@@ -132,4 +135,9 @@ var en = Messages{
 	UnexpectedRevListMsg: "unexpected output from git rev-list",
 	BinaryPreviewMsg:     "(binary file, preview unavailable)",
 	TruncatedSuffixMsg:   "\n… (truncated)",
+
+	UpdateWindowsUnsupportedMsg: "self-update isn't supported on Windows — run install.ps1 manually",
+	UpdateNoSourceDirMsg:        "no source directory recorded (install.sh/install.ps1 wasn't used) — can't self-update",
+	UpdateSourceDirMissingFmt:   "source directory no longer exists: %s",
+	UpdateReadVersionFailedFmt:  "failed to read version.json after pull: %w",
 }

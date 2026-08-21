@@ -116,6 +116,9 @@ type Messages struct {
 	StashingBusy            string
 	ApplyingStashBusy       string
 	DroppingStashBusy       string
+	UpdatingBusy            string
+	UpdateFailedPrefix      string
+	UpdateAvailableLabel    string
 
 	// Panels / normal view
 	GitHubNotConnected    string
@@ -202,4 +205,10 @@ type Messages struct {
 	UnexpectedRevListMsg string
 	BinaryPreviewMsg     string
 	TruncatedSuffixMsg   string
+
+	// update package errors
+	UpdateWindowsUnsupportedMsg string
+	UpdateNoSourceDirMsg        string
+	UpdateSourceDirMissingFmt   string
+	UpdateReadVersionFailedFmt  string
 }

@@ -114,8 +114,15 @@ Write-Ok "Go found: $goVersionRaw (need >= $requiredGo)"
 Write-Step "Building tgit.exe..."
 
 $version = "dev"
-$described = & git -C $scriptDir describe --tags --always --dirty 2>$null
-if ($LASTEXITCODE -eq 0 -and $described) { $version = $described.Trim() }
+$versionJsonPath = Join-Path $scriptDir "version.json"
+if (Test-Path $versionJsonPath) {
+    try {
+        $versionJson = Get-Content $versionJsonPath -Raw | ConvertFrom-Json
+        if ($versionJson.version) { $version = $versionJson.version }
+    } catch {
+        # version.json read/parse failed — fall back to "dev", not fatal.
+    }
+}
 
 New-Item -ItemType Directory -Force -Path $Prefix | Out-Null
 $outPath = Join-Path $Prefix "tgit.exe"
@@ -129,6 +136,15 @@ try {
 }
 Write-Ok "Build ready, version: $version"
 Write-Ok "tgit installed: $outPath"
+
+# ---------- local_version.json ----------
+# Written next to the binary — tgit itself reads it to know its own version
+# and the source directory (so 'u' in the UI can git pull + rebuild).
+$localVersion = [PSCustomObject]@{
+    version    = $version
+    source_dir = $scriptDir
+}
+$localVersion | ConvertTo-Json | Set-Content -Path (Join-Path $Prefix "local_version.json") -Encoding utf8
 
 # ---------- verification ----------
 
