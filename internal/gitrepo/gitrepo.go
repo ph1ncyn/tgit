@@ -460,3 +460,65 @@ func (r *Repo) Untrack(path string) error {
 	_, err := runGit(r.Root, "rm", "--cached", "--quiet", "--", path)
 	return err
 }
+
+// MergeAbort прерывает незавершённый merge, возвращая рабочий каталог и
+// индекс к состоянию до его начала.
+func (r *Repo) MergeAbort() error {
+	_, err := runGitCombined(r.Root, "merge", "--abort")
+	return err
+}
+
+// RebaseAbort прерывает незавершённый rebase, возвращая ветку к состоянию
+// до его начала.
+func (r *Repo) RebaseAbort() error {
+	_, err := runGitCombined(r.Root, "rebase", "--abort")
+	return err
+}
+
+// BranchTrack — статус одной локальной ветки относительно её upstream.
+type BranchTrack struct {
+	Ahead, Behind int
+	Gone          bool
+	NoUpstream    bool
+}
+
+// BranchTracking возвращает статус ahead/behind/gone для всех локальных
+// веток одним вызовом for-each-ref — вместо N отдельных rev-list на ветку.
+func (r *Repo) BranchTracking() (map[string]BranchTrack, error) {
+	out, err := runGit(r.Root, "for-each-ref",
+		"--format=%(refname:short)%09%(upstream)%09%(upstream:track)", "refs/heads")
+	if err != nil {
+		return nil, err
+	}
+	result := map[string]BranchTrack{}
+	for _, line := range splitLines(out) {
+		parts := strings.SplitN(line, "\t", 3)
+		if len(parts) != 3 {
+			continue
+		}
+		result[parts[0]] = parseTrack(parts[1], parts[2])
+	}
+	return result, nil
+}
+
+// parseTrack разбирает вывод `%(upstream)`/`%(upstream:track)` git
+// for-each-ref. upstream пуст только когда у ветки вообще нет upstream —
+// этим отличаем "нет upstream" от "полностью синхронна" (у обеих track пуст).
+func parseTrack(upstream, track string) BranchTrack {
+	if upstream == "" {
+		return BranchTrack{NoUpstream: true}
+	}
+	if strings.Contains(track, "[gone]") {
+		return BranchTrack{Gone: true}
+	}
+	t := BranchTrack{}
+	for _, part := range strings.Split(strings.Trim(track, "[]"), ",") {
+		part = strings.TrimSpace(part)
+		if n, ok := strings.CutPrefix(part, "ahead "); ok {
+			t.Ahead, _ = strconv.Atoi(n)
+		} else if n, ok := strings.CutPrefix(part, "behind "); ok {
+			t.Behind, _ = strconv.Atoi(n)
+		}
+	}
+	return t
+}

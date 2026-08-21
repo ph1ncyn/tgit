@@ -35,6 +35,16 @@ func fetchCmd(repo *gitrepo.Repo, token string) tea.Cmd {
 	return runAction("fetch", "", func() (string, error) { return repo.Fetch(token) })
 }
 
+// autoFetchCmd — фоновый fetch по таймеру (см. autoFetchInterval в
+// mainscreen.go). В отличие от fetchCmd, не оборачивается в actionResultMsg:
+// результат не показывается пользователю ни при успехе, ни при ошибке.
+func autoFetchCmd(repo *gitrepo.Repo, token string) tea.Cmd {
+	return func() tea.Msg {
+		_, err := repo.Fetch(token)
+		return autoFetchResultMsg{err: err}
+	}
+}
+
 func checkoutCmd(repo *gitrepo.Repo, branch string) tea.Cmd {
 	return runAction("checkout", branch, func() (string, error) { return "", repo.Checkout(branch) })
 }
