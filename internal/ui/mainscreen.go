@@ -199,6 +199,9 @@ func (m mainModel) Update(msg tea.Msg) (mainModel, tea.Cmd) {
 		return m, m.loadCmd()
 
 	case diffLoadedMsg:
+		if !m.diffTargetCurrent(msg.forFocus, msg.forKey) {
+			return m, nil // устаревший ответ на уже сменившийся выбор — игнорируем
+		}
 		if msg.err != nil {
 			m.diff = i18n.T.DiffLoadFailedPrefix + msg.err.Error()
 		} else if msg.content == "" {
@@ -498,6 +501,21 @@ func (m mainModel) moveCursor(delta int) (mainModel, tea.Cmd) {
 		m.diffScroll = clamp(m.diffScroll+delta, 0, maxScroll)
 	}
 	return m, nil
+}
+
+// diffTargetCurrent сообщает, всё ещё ли forKey (путь файла или хеш
+// коммита, в зависимости от forFocus) совпадает с текущим выбором — не с
+// текущим m.focus (можно уйти табом на другую панель, а diff должен
+// остаться прежним), а именно с тем, что сейчас под курсором в
+// соответствующем списке.
+func (m mainModel) diffTargetCurrent(forFocus int, forKey string) bool {
+	switch forFocus {
+	case focusFiles:
+		return m.fileCursor < len(m.files) && m.files[m.fileCursor].Path == forKey
+	case focusLog:
+		return m.commitCursor < len(m.commits) && m.commits[m.commitCursor].Hash == forKey
+	}
+	return false
 }
 
 func (m mainModel) selectionDiffCmd() tea.Cmd {
@@ -1128,6 +1146,16 @@ func maxInt(a, b int) int {
 // укладывается ровно в отведённое число строк).
 const tabWidth = 4
 
+// truncateLine обрезает s так, чтобы её РЕАЛЬНАЯ ширина отображения (в
+// терминальных колонках, см. lipgloss.Width) не превышала max. Считать по
+// числу рун (len([]rune(s))) недостаточно: широкие символы — эмодзи, CJK,
+// нередкие в путях файлов и сообщениях коммитов — занимают 2 колонки при
+// одной руне. Строка с такими символами проходила бы проверку "влезает по
+// числу рун", но реально была бы на 1+ колонку шире панели — lipgloss в
+// этом случае молча переносит хвост строки на следующую строку ВНУТРИ
+// рамки (см. Style.Width().Render()), раздувая высоту панели и ломая
+// построчную раскладку и соседние панели, которые ожидают ровно одну
+// строку на элемент списка.
 func truncateLine(s string, max int) string {
 	if max <= 0 {
 		return ""
@@ -1135,14 +1163,28 @@ func truncateLine(s string, max int) string {
 	if strings.ContainsRune(s, '\t') {
 		s = strings.ReplaceAll(s, "\t", strings.Repeat(" ", tabWidth))
 	}
-	r := []rune(s)
-	if len(r) <= max {
+	if lipgloss.Width(s) <= max {
 		return s
 	}
 	if max <= 1 {
-		return string(r[:max])
+		return truncateToWidth(s, max)
 	}
-	return string(r[:max-1]) + "…"
+	return truncateToWidth(s, max-1) + "…"
+}
+
+// truncateToWidth обрезает s по числу колонок отображения, а не по числу рун.
+func truncateToWidth(s string, max int) string {
+	var b strings.Builder
+	w := 0
+	for _, r := range s {
+		rw := lipgloss.Width(string(r))
+		if w+rw > max {
+			break
+		}
+		b.WriteRune(r)
+		w += rw
+	}
+	return b.String()
 }
 
 func visibleWindow(cursor, total, maxRows int) (start, end int) {
