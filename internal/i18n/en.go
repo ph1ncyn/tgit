@@ -109,8 +109,18 @@ var en = Messages{
 	CloneActionHelp:      "c — clone a repository into this folder  •  ctrl+c — quit",
 	SelectOpenHelpPrefix: "↑/↓ — select  •  enter — open project  •  ",
 
-	MacJunkTitleFmt:  "%d macOS junk file(s) (._*, .DS_Store) found in repository",
-	JunkDirsTitleFmt: "%d build/dependency director(y/ies) missing from .gitignore",
+	MacJunkTitleFmt:          "%d macOS junk file(s) (._*, .DS_Store) found in repository",
+	JunkDirsTitleFmt:         "%d build/dependency director(y/ies) missing from .gitignore",
+	DetachedHeadTitle:        "Detached HEAD",
+	DetachedHeadDetail:       "you're not on any branch — fixing creates a new branch at the current commit so nothing is lost",
+	MergeInProgressTitle:     "Merge in progress",
+	MergeInProgressDetail:    "an unfinished merge is blocking normal operations — fixing aborts it and restores the pre-merge state",
+	RebaseInProgressTitle:    "Rebase in progress",
+	RebaseInProgressDetail:   "an unfinished rebase is blocking normal operations — fixing aborts it and restores the pre-rebase state",
+	MixedLineEndingsTitleFmt: "%d tracked file(s) with mixed line endings (CRLF)",
+
+	BranchGoneBadge:       "[gone]",
+	BranchNoUpstreamBadge: "(no upstream)",
 
 	NetworkErrFmt:       "network: %w",
 	TokenRejectedMsg:    "GitHub rejected the token (401) — check that it hasn't expired and was copied in full",

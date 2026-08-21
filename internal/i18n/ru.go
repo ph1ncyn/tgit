@@ -109,8 +109,18 @@ var ru = Messages{
 	CloneActionHelp:      "c — клонировать репозиторий в эту папку  •  ctrl+c — выйти",
 	SelectOpenHelpPrefix: "↑/↓ — выбрать  •  enter — открыть проект  •  ",
 
-	MacJunkTitleFmt:  "Файлы macOS (._*, .DS_Store) в репозитории: %d шт.",
-	JunkDirsTitleFmt: "Служебные каталоги не в .gitignore: %d шт.",
+	MacJunkTitleFmt:          "Файлы macOS (._*, .DS_Store) в репозитории: %d шт.",
+	JunkDirsTitleFmt:         "Служебные каталоги не в .gitignore: %d шт.",
+	DetachedHeadTitle:        "Оторванный HEAD (detached HEAD)",
+	DetachedHeadDetail:       "вы не на ветке — исправление создаст новую ветку на текущем коммите, ничего не потеряется",
+	MergeInProgressTitle:     "Незавершённый merge",
+	MergeInProgressDetail:    "незавершённый merge мешает обычной работе — исправление прервёт его и вернёт состояние до начала",
+	RebaseInProgressTitle:    "Незавершённый rebase",
+	RebaseInProgressDetail:   "незавершённый rebase мешает обычной работе — исправление прервёт его и вернёт состояние до начала",
+	MixedLineEndingsTitleFmt: "Файлов со смешанными окончаниями строк (CRLF): %d",
+
+	BranchGoneBadge:       "[исчезла]",
+	BranchNoUpstreamBadge: "(нет upstream)",
 
 	NetworkErrFmt:       "сеть: %w",
 	TokenRejectedMsg:    "GitHub отклонил токен (401) — проверьте, что он не истёк и скопирован полностью",

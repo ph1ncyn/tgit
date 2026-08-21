@@ -3,6 +3,7 @@ package ui
 import (
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/atotto/clipboard"
 	"github.com/charmbracelet/bubbles/spinner"
@@ -15,6 +16,10 @@ import (
 	"tgit/internal/gitrepo"
 	"tgit/internal/i18n"
 )
+
+// autoFetchInterval — как часто в фоне обновляются remote-tracking ссылки,
+// чтобы бейджи ahead/behind оставались живыми без ручного f/P/r.
+const autoFetchInterval = 4 * time.Minute
 
 type mainMode int
 
@@ -39,9 +44,22 @@ type repoDataMsg struct {
 	branch        string
 	ahead, behind int
 	branches      []string
+	branchTrack   map[string]gitrepo.BranchTrack
 	files         []gitrepo.FileStatus
 	commits       []gitrepo.Commit
 	err           error
+}
+
+// autoFetchTickMsg — сигнал таймера фонового fetch (см. autoFetchInterval).
+type autoFetchTickMsg struct{}
+
+// autoFetchResultMsg — результат фонового fetch. Ошибка сознательно
+// нигде не показывается (см. handleAutoFetchResult) — иначе офлайн спамил
+// бы статус-бар каждые autoFetchInterval.
+type autoFetchResultMsg struct{ err error }
+
+func autoFetchTickCmd() tea.Cmd {
+	return tea.Tick(autoFetchInterval, func(time.Time) tea.Msg { return autoFetchTickMsg{} })
 }
 
 type mainModel struct {
@@ -52,6 +70,7 @@ type mainModel struct {
 	branch        string
 	ahead, behind int
 	branches      []string
+	branchTrack   map[string]gitrepo.BranchTrack
 	branchCursor  int
 
 	files      []gitrepo.FileStatus
@@ -80,6 +99,8 @@ type mainModel struct {
 	busy      bool
 	busyLabel string
 	spinner   spinner.Model
+
+	autoFetching bool
 
 	status    string
 	statusErr bool
@@ -128,6 +149,7 @@ func (m mainModel) loadCmd() tea.Cmd {
 		if err != nil {
 			return repoDataMsg{err: err}
 		}
+		branchTrack, _ := repo.BranchTracking() // ошибка не фатальна — просто не покажем бейджи
 		files, err := repo.Status()
 		if err != nil {
 			return repoDataMsg{err: err}
@@ -136,12 +158,16 @@ func (m mainModel) loadCmd() tea.Cmd {
 		if err != nil {
 			return repoDataMsg{err: err}
 		}
-		return repoDataMsg{branch: branch, ahead: ahead, behind: behind, branches: branches, files: files, commits: commits}
+		return repoDataMsg{
+			branch: branch, ahead: ahead, behind: behind,
+			branches: branches, branchTrack: branchTrack,
+			files: files, commits: commits,
+		}
 	}
 }
 
 func (m mainModel) Init() tea.Cmd {
-	return m.loadCmd()
+	return tea.Batch(m.loadCmd(), autoFetchTickCmd())
 }
 
 func (m mainModel) Update(msg tea.Msg) (mainModel, tea.Cmd) {
@@ -160,6 +186,17 @@ func (m mainModel) Update(msg tea.Msg) (mainModel, tea.Cmd) {
 
 	case repoDataMsg:
 		return m.applyRepoData(msg)
+
+	case autoFetchTickMsg:
+		if m.repo == nil || m.busy || m.autoFetching {
+			return m, autoFetchTickCmd() // пропускаем цикл, но таймер не глохнет
+		}
+		m.autoFetching = true
+		return m, tea.Batch(autoFetchCmd(m.repo, m.ghToken), autoFetchTickCmd())
+
+	case autoFetchResultMsg:
+		m.autoFetching = false
+		return m, m.loadCmd()
 
 	case diffLoadedMsg:
 		if msg.err != nil {
@@ -239,6 +276,7 @@ func (m mainModel) applyRepoData(msg repoDataMsg) (mainModel, tea.Cmd) {
 	m.branch = msg.branch
 	m.ahead, m.behind = msg.ahead, msg.behind
 	m.branches = msg.branches
+	m.branchTrack = msg.branchTrack
 	m.branchCursor = clamp(m.branchCursor, 0, maxInt(len(m.branches)-1, 0))
 	m.files = msg.files
 	m.fileCursor = clamp(m.fileCursor, 0, maxInt(len(m.files)-1, 0))
@@ -791,7 +829,7 @@ func (m mainModel) renderBranchesPanel(w, h int) string {
 			if b == m.branch {
 				prefix, style = "⎇ ", okStyle
 			}
-			text := truncateLine(prefix+b, innerW)
+			text := truncateLine(prefix+b+branchTrackBadge(m.branchTrack[b]), innerW)
 			if i == m.branchCursor && m.focus == focusBranches {
 				style = style.Reverse(true)
 			}
@@ -800,6 +838,25 @@ func (m mainModel) renderBranchesPanel(w, h int) string {
 	}
 	title := titleStyle.Render(i18n.T.PanelBranchesTitle)
 	return panelStyleFor(m.focus == focusBranches).Width(w).Height(h).Render(title + "\n" + strings.Join(lines, "\n"))
+}
+
+// branchTrackBadge форматирует статус ветки относительно её upstream для
+// строки в панели Branches. Пустая строка (в т.ч. для отсутствующей в карте
+// ветки — например если BranchTracking() не смог выполниться) — без бейджа.
+func branchTrackBadge(tr gitrepo.BranchTrack) string {
+	switch {
+	case tr.Gone:
+		return " " + i18n.T.BranchGoneBadge
+	case tr.NoUpstream:
+		return " " + i18n.T.BranchNoUpstreamBadge
+	case tr.Ahead > 0 && tr.Behind > 0:
+		return fmt.Sprintf(" ↑%d↓%d", tr.Ahead, tr.Behind)
+	case tr.Ahead > 0:
+		return fmt.Sprintf(" ↑%d", tr.Ahead)
+	case tr.Behind > 0:
+		return fmt.Sprintf(" ↓%d", tr.Behind)
+	}
+	return ""
 }
 
 func (m mainModel) renderFilesPanel(w, h int) string {

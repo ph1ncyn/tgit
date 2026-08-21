@@ -176,8 +176,19 @@ type Messages struct {
 	SelectOpenHelpPrefix string
 
 	// doctor package issue titles
-	MacJunkTitleFmt  string
-	JunkDirsTitleFmt string
+	MacJunkTitleFmt          string
+	JunkDirsTitleFmt         string
+	DetachedHeadTitle        string
+	DetachedHeadDetail       string
+	MergeInProgressTitle     string
+	MergeInProgressDetail    string
+	RebaseInProgressTitle    string
+	RebaseInProgressDetail   string
+	MixedLineEndingsTitleFmt string
+
+	// branches panel badges
+	BranchGoneBadge       string
+	BranchNoUpstreamBadge string
 
 	// ghauth package errors
 	NetworkErrFmt       string
