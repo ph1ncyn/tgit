@@ -1,17 +1,17 @@
 #!/usr/bin/env bash
-# install.sh — проверяет зависимости, собирает tgit и кладёт его в PATH,
-# чтобы после установки был доступен просто как команда `tgit`.
+# install.sh — checks dependencies, builds tgit, and puts it on PATH so it's
+# available afterwards as just the `tgit` command.
 #
-# Использование:
-#   ./install.sh                 # установить в ~/.local/bin (без sudo)
-#   ./install.sh --system        # установить в /usr/local/bin (нужен sudo)
-#   ./install.sh --prefix=DIR    # установить в произвольный каталог
+# Usage:
+#   ./install.sh                 # install to ~/.local/bin (no sudo)
+#   ./install.sh --system        # install to /usr/local/bin (needs sudo)
+#   ./install.sh --prefix=DIR    # install to an arbitrary directory
 #
-# Поддерживаются Linux и macOS. Для Windows используйте install.ps1 (PowerShell).
+# Linux and macOS are supported. For Windows use install.ps1 (PowerShell).
 
 set -euo pipefail
 
-# ---------- вывод ----------
+# ---------- output ----------
 
 if [ -t 1 ] && command -v tput >/dev/null 2>&1 && [ "$(tput colors 2>/dev/null || echo 0)" -ge 8 ]; then
 	c_red=$(tput setaf 1); c_green=$(tput setaf 2); c_yellow=$(tput setaf 3)
@@ -26,7 +26,7 @@ warn()  { printf '%s\n' "${c_yellow}!${c_reset} $*" >&2; }
 err()   { printf '%s\n' "${c_red}✗${c_reset} $*" >&2; }
 die()   { err "$*"; exit 1; }
 
-# ---------- аргументы ----------
+# ---------- arguments ----------
 
 PREFIX="$HOME/.local/bin"
 SYSTEM_INSTALL=0
@@ -41,54 +41,54 @@ for arg in "$@"; do
 		PREFIX="${arg#--prefix=}"
 		;;
 	-h | --help)
-		sed -n '2,12p' "$0" | sed 's/^# \{0,1\}//'
+		sed -n '2,10p' "$0" | sed 's/^# \{0,1\}//'
 		exit 0
 		;;
 	*)
-		die "Неизвестный аргумент: $arg (см. --help)"
+		die "Unknown argument: $arg (see --help)"
 		;;
 	esac
 done
 
-# ---------- определение ОС ----------
+# ---------- OS detection ----------
 
 case "$(uname -s)" in
 Linux*) OS=linux ;;
 Darwin*) OS=darwin ;;
 MINGW* | MSYS* | CYGWIN*)
-	die "Обнаружена Windows-среда. Используй install.ps1 (PowerShell): .\\install.ps1 -AddToPath"
+	die "Windows environment detected. Use install.ps1 (PowerShell): .\\install.ps1 -AddToPath"
 	;;
 *)
-	die "Неизвестная ОС: $(uname -s). Поддержаны Linux и macOS."
+	die "Unknown OS: $(uname -s). Linux and macOS are supported."
 	;;
 esac
 
 BIN_NAME="tgit"
 OUT_PATH="$PREFIX/$BIN_NAME"
 
-# ---------- проверка git ----------
+# ---------- checking git ----------
 
-info "Проверяю git..."
+info "Checking git..."
 if ! command -v git >/dev/null 2>&1; then
-	err "git не найден в PATH."
+	err "git not found in PATH."
 	case "$OS" in
-	darwin) echo "  Установить: brew install git  (или xcode-select --install)" ;;
-	linux) echo "  Установить: sudo apt install git   /   sudo dnf install git   /   sudo pacman -S git" ;;
+	darwin) echo "  Install: brew install git  (or xcode-select --install)" ;;
+	linux) echo "  Install: sudo apt install git   /   sudo dnf install git   /   sudo pacman -S git" ;;
 	esac
 	exit 1
 fi
-ok "git найден: $(git --version)"
+ok "git found: $(git --version)"
 
-# ---------- проверка go ----------
+# ---------- checking go ----------
 
-info "Проверяю Go..."
+info "Checking Go..."
 if ! command -v go >/dev/null 2>&1; then
-	err "Go не найден в PATH."
+	err "Go not found in PATH."
 	case "$OS" in
-	darwin) echo "  Установить: brew install go" ;;
-	linux) echo "  Установить: sudo apt install golang   /   sudo dnf install golang   /   sudo pacman -S go" ;;
+	darwin) echo "  Install: brew install go" ;;
+	linux) echo "  Install: sudo apt install golang   /   sudo dnf install golang   /   sudo pacman -S go" ;;
 	esac
-	echo "  Либо скачать с официальной страницы загрузок Go для вашей ОС."
+	echo "  Or download it from the official Go downloads page for your OS."
 	exit 1
 fi
 
@@ -96,7 +96,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REQUIRED_GO="$(grep -E '^go [0-9]' "$SCRIPT_DIR/go.mod" | awk '{print $2}')"
 
 version_ge() {
-	# $1 >= $2 ? для версий вида X.Y[.Z]
+	# is $1 >= $2 ? for versions of the form X.Y[.Z]
 	local IFS=.
 	local -a a=($1) b=($2)
 	local i ai bi
@@ -112,21 +112,21 @@ CURRENT_GO_RAW="$(go env GOVERSION)"
 CURRENT_GO="$(echo "$CURRENT_GO_RAW" | sed -E 's/^go([0-9]+\.[0-9]+(\.[0-9]+)?).*/\1/')"
 
 if ! version_ge "$CURRENT_GO" "$REQUIRED_GO"; then
-	die "Нужен Go >= $REQUIRED_GO, установлен $CURRENT_GO_RAW."
+	die "Go >= $REQUIRED_GO is required, found $CURRENT_GO_RAW."
 fi
-ok "Go найден: $CURRENT_GO_RAW (нужен >= $REQUIRED_GO)"
+ok "Go found: $CURRENT_GO_RAW (need >= $REQUIRED_GO)"
 
-# ---------- сборка ----------
+# ---------- build ----------
 
-info "Собираю tgit..."
+info "Building tgit..."
 VERSION="$(git -C "$SCRIPT_DIR" describe --tags --always --dirty 2>/dev/null || echo dev)"
 
 if [ "$SYSTEM_INSTALL" -eq 1 ]; then
 	TMP_BIN="$(mktemp -t tgit-build.XXXXXX)"
 	(cd "$SCRIPT_DIR" && go build -ldflags "-X main.version=$VERSION" -o "$TMP_BIN" .)
-	ok "Сборка готова, версия: $VERSION"
+	ok "Build ready, version: $VERSION"
 
-	info "Устанавливаю в $OUT_PATH (нужны права root)..."
+	info "Installing to $OUT_PATH (needs root privileges)..."
 	sudo mkdir -p "$PREFIX"
 	sudo install -m 755 "$TMP_BIN" "$OUT_PATH"
 	rm -f "$TMP_BIN"
@@ -134,44 +134,44 @@ else
 	mkdir -p "$PREFIX"
 	(cd "$SCRIPT_DIR" && go build -ldflags "-X main.version=$VERSION" -o "$OUT_PATH" .)
 	chmod 755 "$OUT_PATH"
-	ok "Сборка готова, версия: $VERSION"
+	ok "Build ready, version: $VERSION"
 fi
 
-ok "tgit установлен: $OUT_PATH"
+ok "tgit installed: $OUT_PATH"
 
-# ---------- проверка ----------
+# ---------- verification ----------
 
 INSTALLED_VERSION_OUTPUT="$("$OUT_PATH" --version 2>&1 || true)"
 if [ -n "$INSTALLED_VERSION_OUTPUT" ]; then
-	ok "Проверка запуска: $INSTALLED_VERSION_OUTPUT"
+	ok "Launch check: $INSTALLED_VERSION_OUTPUT"
 else
-	warn "Не удалось запустить $OUT_PATH --version — проверьте вручную."
+	warn "Could not run $OUT_PATH --version — please check manually."
 fi
 
 # ---------- PATH ----------
 
 case ":$PATH:" in
 *":$PREFIX:"*)
-	ok "$PREFIX уже в PATH — команда 'tgit' готова к использованию."
+	ok "$PREFIX is already on PATH — the 'tgit' command is ready to use."
 	;;
 *)
-	warn "$PREFIX отсутствует в PATH."
+	warn "$PREFIX is not on PATH."
 	echo
 	case "${SHELL:-}" in
 	*/fish)
-		echo "  Выполните один раз — fish сохранит это сам, перезапуск терминала не нужен:"
+		echo "  Run this once — fish saves it automatically, no terminal restart needed:"
 		echo
 		echo "    fish_add_path $PREFIX"
 		;;
 	*/zsh)
-		echo "  Добавьте строку в ~/.zshrc и перезапустите терминал (или выполните: source ~/.zshrc):"
+		echo "  Add this line to ~/.zshrc and restart your terminal (or run: source ~/.zshrc):"
 		echo
 		echo "    echo 'export PATH=\"$PREFIX:\$PATH\"' >> ~/.zshrc"
 		;;
 	*)
-		echo "  Добавьте строку в конфиг вашей оболочки и перезапустите терминал:"
+		echo "  Add this line to your shell config and restart your terminal:"
 		echo
-		echo "    echo 'export PATH=\"$PREFIX:\$PATH\"' >> ~/.bashrc   # или ~/.zshrc, ~/.profile"
+		echo "    echo 'export PATH=\"$PREFIX:\$PATH\"' >> ~/.bashrc   # or ~/.zshrc, ~/.profile"
 		;;
 	esac
 	echo
@@ -179,4 +179,4 @@ case ":$PATH:" in
 esac
 
 echo
-ok "Готово. Запуск: ${c_bold}tgit${c_reset} из каталога любого git-репозитория."
+ok "Done. Run: ${c_bold}tgit${c_reset} from inside any git repository."

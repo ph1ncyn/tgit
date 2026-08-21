@@ -102,22 +102,32 @@ func stashStatCmd(repo *gitrepo.Repo, ref string) tea.Cmd {
 
 // --- diff ---
 
+// diffLoadedMsg — результат асинхронной загрузки diff одного файла/коммита.
+// forFocus+forKey фиксируют, для какого именно выбора он был запрошен —
+// при быстрой прокрутке в полёте может оказаться несколько таких запросов
+// одновременно, и приходят они не обязательно в том же порядке, в котором
+// были отправлены. Update сверяет forFocus/forKey с текущим выбором и
+// отбрасывает устаревший ответ, вместо того чтобы просто показать то, что
+// прилетело последним (иначе в панели Diff можно увидеть кусок diff'а не
+// той строки, что сейчас выделена, или обрывки двух разных коммитов подряд).
 type diffLoadedMsg struct {
-	content string
-	err     error
+	content  string
+	err      error
+	forFocus int
+	forKey   string
 }
 
 func diffFileCmd(repo *gitrepo.Repo, path string, staged bool) tea.Cmd {
 	return func() tea.Msg {
 		d, err := repo.DiffFile(path, staged)
-		return diffLoadedMsg{content: d, err: err}
+		return diffLoadedMsg{content: d, err: err, forFocus: focusFiles, forKey: path}
 	}
 }
 
 func diffCommitCmd(repo *gitrepo.Repo, hash string) tea.Cmd {
 	return func() tea.Msg {
 		d, err := repo.DiffCommit(hash)
-		return diffLoadedMsg{content: d, err: err}
+		return diffLoadedMsg{content: d, err: err, forFocus: focusLog, forKey: hash}
 	}
 }
 

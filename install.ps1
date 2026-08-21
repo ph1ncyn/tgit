@@ -1,19 +1,21 @@
-﻿#requires -version 5.1
+#requires -version 5.1
 <#
 .SYNOPSIS
-  Проверяет зависимости, собирает tgit.exe и (по желанию) добавляет его в PATH.
+  Checks dependencies, builds tgit.exe, and (optionally) adds it to PATH.
 
 .DESCRIPTION
-  Windows-аналог install.sh: проверяет наличие git и нужной версии Go (по go.mod),
-  собирает бинарник и кладёт его в каталог установки. Добавление в PATH — по явному
-  флагу -AddToPath, чтобы не менять окружение пользователя без спроса.
+  Windows counterpart of install.sh: checks for git and the required Go
+  version (from go.mod), builds the binary, and places it in the install
+  directory. Adding to PATH requires the explicit -AddToPath flag, so the
+  user's environment isn't changed without asking.
 
 .PARAMETER Prefix
-  Каталог установки. По умолчанию — $env:LOCALAPPDATA\Programs\tgit (не требует прав администратора).
+  Install directory. Defaults to $env:LOCALAPPDATA\Programs\tgit (no admin rights needed).
 
 .PARAMETER AddToPath
-  Добавить каталог установки в PATH текущего пользователя (реестр, HKCU) и в PATH текущей сессии.
-  Без этого флага скрипт только покажет, что нужно сделать.
+  Add the install directory to the current user's PATH (registry, HKCU) and
+  to the current session's PATH. Without this flag the script only shows
+  what needs to be done.
 
 .EXAMPLE
   .\install.ps1
@@ -25,7 +27,7 @@
   .\install.ps1 -Prefix 'C:\tools\tgit' -AddToPath
 
 .NOTES
-  Если запуск .ps1-файлов заблокирован политикой выполнения, запустите разово:
+  If running .ps1 files is blocked by execution policy, run this once:
     powershell -ExecutionPolicy Bypass -File install.ps1
 #>
 
@@ -36,8 +38,9 @@ param(
 )
 
 $ErrorActionPreference = "Stop"
-# В PowerShell 7.3+ ненулевой код возврата внешней команды (git/go) иначе сам
-# бросает завершающую ошибку раньше, чем скрипт успевает проверить $LASTEXITCODE.
+# On PowerShell 7.3+, a nonzero exit code from an external command (git/go)
+# would otherwise throw a terminating error before the script gets to check
+# $LASTEXITCODE itself.
 $PSNativeCommandUseErrorActionPreference = $false
 
 function Write-Step  { param($m) Write-Host "==> $m" -ForegroundColor Cyan }
@@ -51,36 +54,36 @@ if (-not $scriptDir) { $scriptDir = (Get-Location).Path }
 
 # ---------- git ----------
 
-Write-Step "Проверяю git..."
+Write-Step "Checking git..."
 $gitCmd = Get-Command git -ErrorAction SilentlyContinue
 if (-not $gitCmd) {
-    Write-ErrMsg "git не найден в PATH."
-    Write-Host "  Установить: winget install --id Git.Git -e"
-    Write-Host "  или:        choco install git"
-    Write-Host "  или скачать с официальной страницы git-scm.com"
+    Write-ErrMsg "git not found in PATH."
+    Write-Host "  Install: winget install --id Git.Git -e"
+    Write-Host "  or:      choco install git"
+    Write-Host "  or download it from the official git-scm.com page"
     exit 1
 }
-Write-Ok "git найден: $(git --version)"
+Write-Ok "git found: $(git --version)"
 
 # ---------- go ----------
 
-Write-Step "Проверяю Go..."
+Write-Step "Checking Go..."
 $goCmd = Get-Command go -ErrorAction SilentlyContinue
 if (-not $goCmd) {
-    Write-ErrMsg "Go не найден в PATH."
-    Write-Host "  Установить: winget install --id GoLang.Go -e"
-    Write-Host "  или:        choco install golang"
-    Write-Host "  или скачать с официальной страницы go.dev/dl"
+    Write-ErrMsg "Go not found in PATH."
+    Write-Host "  Install: winget install --id GoLang.Go -e"
+    Write-Host "  or:      choco install golang"
+    Write-Host "  or download it from the official go.dev/dl page"
     exit 1
 }
 
 $goModPath = Join-Path $scriptDir "go.mod"
 if (-not (Test-Path $goModPath)) {
-    Fail "Не найден go.mod рядом со скриптом ($scriptDir) — запустите install.ps1 из корня репозитория tgit."
+    Fail "go.mod not found next to the script ($scriptDir) — run install.ps1 from the root of the tgit repository."
 }
 $goModLine = Select-String -Path $goModPath -Pattern '^go (\d+\.\d+(\.\d+)?)' | Select-Object -First 1
 if (-not $goModLine) {
-    Fail "Не удалось прочитать требуемую версию Go из go.mod."
+    Fail "Could not read the required Go version from go.mod."
 }
 $requiredGo = $goModLine.Matches[0].Groups[1].Value
 
@@ -88,7 +91,7 @@ $goVersionRaw = (& go env GOVERSION)
 if ($goVersionRaw -match 'go(\d+\.\d+(\.\d+)?)') {
     $currentGo = $Matches[1]
 } else {
-    Fail "Не удалось распознать версию Go из '$goVersionRaw'."
+    Fail "Could not parse the Go version from '$goVersionRaw'."
 }
 
 function Test-VersionGe($a, $b) {
@@ -102,13 +105,13 @@ function Test-VersionGe($a, $b) {
 }
 
 if (-not (Test-VersionGe $currentGo $requiredGo)) {
-    Fail "Нужен Go >= $requiredGo, установлен $goVersionRaw."
+    Fail "Go >= $requiredGo is required, found $goVersionRaw."
 }
-Write-Ok "Go найден: $goVersionRaw (нужен >= $requiredGo)"
+Write-Ok "Go found: $goVersionRaw (need >= $requiredGo)"
 
-# ---------- сборка ----------
+# ---------- build ----------
 
-Write-Step "Собираю tgit.exe..."
+Write-Step "Building tgit.exe..."
 
 $version = "dev"
 $described = & git -C $scriptDir describe --tags --always --dirty 2>$null
@@ -120,48 +123,48 @@ $outPath = Join-Path $Prefix "tgit.exe"
 Push-Location $scriptDir
 try {
     & go build -ldflags "-X main.version=$version" -o $outPath .
-    if ($LASTEXITCODE -ne 0) { Fail "Сборка не удалась." }
+    if ($LASTEXITCODE -ne 0) { Fail "Build failed." }
 } finally {
     Pop-Location
 }
-Write-Ok "Сборка готова, версия: $version"
-Write-Ok "tgit установлен: $outPath"
+Write-Ok "Build ready, version: $version"
+Write-Ok "tgit installed: $outPath"
 
-# ---------- проверка ----------
+# ---------- verification ----------
 
-Write-Step "Проверка запуска..."
+Write-Step "Checking that it runs..."
 try {
     $verOut = & $outPath --version
-    Write-Ok "Проверка запуска: $verOut"
+    Write-Ok "Launch check: $verOut"
 } catch {
-    Write-WarnMsg "Не удалось запустить $outPath --version — проверьте вручную."
+    Write-WarnMsg "Could not run $outPath --version — please check manually."
 }
 
 # ---------- PATH ----------
 
-Write-Step "Проверяю PATH..."
+Write-Step "Checking PATH..."
 $normalizedPrefix = $Prefix.TrimEnd('\')
 $pathEntries = $env:Path -split ';' | Where-Object { $_ -ne '' }
 $alreadyInPath = $pathEntries | Where-Object { $_.TrimEnd('\') -ieq $normalizedPrefix }
 
 if ($alreadyInPath) {
-    Write-Ok "$Prefix уже в PATH — команда 'tgit' готова к использованию."
+    Write-Ok "$Prefix is already on PATH — the 'tgit' command is ready to use."
 } elseif ($AddToPath) {
     $userPath = [Environment]::GetEnvironmentVariable('Path', 'User')
     $newUserPath = if ([string]::IsNullOrEmpty($userPath)) { $Prefix } else { "$userPath;$Prefix" }
     [Environment]::SetEnvironmentVariable('Path', $newUserPath, 'User')
     $env:Path = "$env:Path;$Prefix"
-    Write-Ok "$Prefix добавлен в PATH пользователя. В уже открытых терминалах команда появится после перезапуска."
+    Write-Ok "$Prefix added to the user's PATH. Already-open terminals will pick it up after a restart."
 } else {
-    Write-WarnMsg "$Prefix отсутствует в PATH."
+    Write-WarnMsg "$Prefix is not on PATH."
     Write-Host ""
-    Write-Host "  Добавить сейчас автоматически:"
+    Write-Host "  Add it automatically now:"
     Write-Host "    .\install.ps1 -AddToPath"
     Write-Host ""
-    Write-Host "  Либо вручную, для текущего пользователя:"
+    Write-Host "  Or manually, for the current user:"
     Write-Host "    [Environment]::SetEnvironmentVariable('Path', `$env:Path + ';$Prefix', 'User')"
     Write-Host ""
 }
 
 Write-Host ""
-Write-Ok "Готово. Запуск: tgit из каталога любого git-репозитория."
+Write-Ok "Done. Run: tgit from inside any git repository."

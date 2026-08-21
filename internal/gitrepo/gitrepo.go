@@ -236,6 +236,19 @@ func (r *Repo) Log(limit int) ([]Commit, error) {
 	return commits, nil
 }
 
+// sanitizeCR убирает голый \r из текста перед показом в терминале. Diff
+// файла с CRLF-окончаниями строк несёт \r как часть содержимого КАЖДОЙ
+// удалённой строки (git diff отдаёт байты как есть); если пропустить его
+// в терминал как есть, тот воспримет "голый" \r посреди строки как
+// "вернуть курсор в начало строки" — и следующие байты того же вывода
+// затирают уже напечатанное левее на той же физической строке экрана
+// (включая соседние панели — Ветки/Файлы делят с Diff одну строку).
+// \r\n схлопывается в \n, одиночный оставшийся \r тоже становится переносом.
+func sanitizeCR(s string) string {
+	s = strings.ReplaceAll(s, "\r\n", "\n")
+	return strings.ReplaceAll(s, "\r", "\n")
+}
+
 // DiffFile возвращает diff одного файла (застейдженный или рабочий, в
 // зависимости от staged). Для untracked-файлов diff пуст, поэтому вместо
 // него показываем начало содержимого файла как превью.
@@ -250,7 +263,7 @@ func (r *Repo) DiffFile(path string, staged bool) (string, error) {
 		return "", err
 	}
 	if strings.TrimSpace(out) != "" {
-		return out, nil
+		return sanitizeCR(out), nil
 	}
 	return r.untrackedPreview(path)
 }
@@ -276,12 +289,16 @@ func (r *Repo) untrackedPreview(path string) (string, error) {
 	if n == maxBytes {
 		suffix = i18n.T.TruncatedSuffixMsg
 	}
-	return string(buf) + suffix, nil
+	return sanitizeCR(string(buf)) + suffix, nil
 }
 
 // DiffCommit возвращает сообщение коммита и его diff.
 func (r *Repo) DiffCommit(hash string) (string, error) {
-	return runGit(r.Root, "show", hash)
+	out, err := runGit(r.Root, "show", hash)
+	if err != nil {
+		return "", err
+	}
+	return sanitizeCR(out), nil
 }
 
 // Stash — одна запись `git stash list`.
