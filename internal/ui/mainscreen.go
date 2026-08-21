@@ -276,6 +276,12 @@ func (m mainModel) Update(msg tea.Msg) (mainModel, tea.Cmd) {
 		m.restartExe = msg.exe
 		return m, tea.Quit
 
+	case selectionSettledMsg:
+		if !m.diffTargetCurrent(msg.forFocus, msg.forKey) {
+			return m, nil // курсор уже уехал дальше — устаревший тик, ждём следующий
+		}
+		return m, m.selectionDiffCmd()
+
 	case diffLoadedMsg:
 		if !m.diffTargetCurrent(msg.forFocus, msg.forKey) {
 			return m, nil // устаревший ответ на уже сменившийся выбор — игнорируем
@@ -574,18 +580,43 @@ func (m mainModel) moveCursor(delta int) (mainModel, tea.Cmd) {
 			return m, nil
 		}
 		m.fileCursor = clamp(m.fileCursor+delta, 0, len(m.files)-1)
-		return m, m.selectionDiffCmd()
+		return m, selectionDebounceCmd(focusFiles, m.files[m.fileCursor].Path)
 	case focusLog:
 		if len(m.commits) == 0 {
 			return m, nil
 		}
 		m.commitCursor = clamp(m.commitCursor+delta, 0, len(m.commits)-1)
-		return m, m.selectionDiffCmd()
+		return m, selectionDebounceCmd(focusLog, m.commits[m.commitCursor].Hash)
 	case focusDiff:
 		maxScroll := maxInt(len(strings.Split(m.diff, "\n"))-1, 0)
 		m.diffScroll = clamp(m.diffScroll+delta, 0, maxScroll)
 	}
 	return m, nil
+}
+
+// selectionDebounceInterval — сколько ждать без нового движения курсора,
+// прежде чем реально запускать git diff/show для выделенной строки. Без
+// этого каждое отдельное движение при быстрой прокрутке (особенно колесом
+// на трекпаде macOS, который может выдавать по 50-100 событий в секунду)
+// запускало бы свой git-процесс и полную перерисовку экрана — именно это
+// захлёбывало терминал и портило верх экрана при быстрой прокрутке вверх/вниз.
+const selectionDebounceInterval = 80 * time.Millisecond
+
+// selectionSettledMsg — сигнал "курсор какое-то время не двигался, можно
+// грузить diff для того, что сейчас выделено". forFocus/forKey фиксируют
+// выделение на момент ПЛАНИРОВАНИЯ тика; проверяются в Update через тот же
+// diffTargetCurrent, что и для diffLoadedMsg — если курсор успел уйти
+// дальше, устаревший тик просто отбрасывается (следующее движение уже
+// запланировало свой).
+type selectionSettledMsg struct {
+	forFocus int
+	forKey   string
+}
+
+func selectionDebounceCmd(focus int, key string) tea.Cmd {
+	return tea.Tick(selectionDebounceInterval, func(time.Time) tea.Msg {
+		return selectionSettledMsg{forFocus: focus, forKey: key}
+	})
 }
 
 // diffTargetCurrent сообщает, всё ещё ли forKey (путь файла или хеш
