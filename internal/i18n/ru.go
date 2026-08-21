@@ -57,6 +57,9 @@ var ru = Messages{
 	StashingBusy:            "прячу изменения в стэш...",
 	ApplyingStashBusy:       "применяю стэш...",
 	DroppingStashBusy:       "удаляю стэш...",
+	UpdatingBusy:            "обновляюсь (git pull + сборка)...",
+	UpdateFailedPrefix:      "обновление не удалось: ",
+	UpdateAvailableLabel:    "доступно обновление (u)",
 
 	GitHubNotConnected:    "GitHub: не подключён (g — войти)",
 	GitHubConnectedPrefix: "GitHub: ",
@@ -132,4 +135,9 @@ var ru = Messages{
 	UnexpectedRevListMsg: "неожиданный вывод git rev-list",
 	BinaryPreviewMsg:     "(бинарный файл, предпросмотр недоступен)",
 	TruncatedSuffixMsg:   "\n… (обрезано)",
+
+	UpdateWindowsUnsupportedMsg: "автообновление не поддерживается на Windows — запустите install.ps1 вручную",
+	UpdateNoSourceDirMsg:        "не сохранён каталог исходников (установка была не через install.sh/install.ps1) — автообновление недоступно",
+	UpdateSourceDirMissingFmt:   "каталог исходников больше не существует: %s",
+	UpdateReadVersionFailedFmt:  "не удалось прочитать version.json после pull: %w",
 }

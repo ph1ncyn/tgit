@@ -119,7 +119,10 @@ ok "Go found: $CURRENT_GO_RAW (need >= $REQUIRED_GO)"
 # ---------- build ----------
 
 info "Building tgit..."
-VERSION="$(git -C "$SCRIPT_DIR" describe --tags --always --dirty 2>/dev/null || echo dev)"
+VERSION="$(grep -o '"version"[[:space:]]*:[[:space:]]*"[^"]*"' "$SCRIPT_DIR/version.json" 2>/dev/null | sed -E 's/.*"([^"]+)"$/\1/')"
+if [ -z "$VERSION" ]; then
+	VERSION="dev"
+fi
 
 if [ "$SYSTEM_INSTALL" -eq 1 ]; then
 	TMP_BIN="$(mktemp -t tgit-build.XXXXXX)"
@@ -138,6 +141,16 @@ else
 fi
 
 ok "tgit installed: $OUT_PATH"
+
+# ---------- local_version.json ----------
+# Записывается рядом с бинарником — по нему сам tgit узнаёт свою версию и
+# каталог исходников (чтобы 'u' в интерфейсе мог сделать git pull + пересборку).
+LOCAL_VERSION_JSON="$(printf '{\n  "version": "%s",\n  "source_dir": "%s"\n}\n' "$VERSION" "$SCRIPT_DIR")"
+if [ "$SYSTEM_INSTALL" -eq 1 ]; then
+	printf '%s' "$LOCAL_VERSION_JSON" | sudo tee "$PREFIX/local_version.json" >/dev/null
+else
+	printf '%s' "$LOCAL_VERSION_JSON" > "$PREFIX/local_version.json"
+fi
 
 # ---------- verification ----------
 

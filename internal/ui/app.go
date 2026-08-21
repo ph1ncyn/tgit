@@ -79,6 +79,13 @@ func (a *App) applyLanguage(lang i18n.Lang) {
 	a.main.branchFilter.Placeholder = i18n.T.BranchFilterPlaceholder
 }
 
+// RestartExe — путь к обновлённому бинарнику, который нужно перезапустить
+// после чистого выхода (main.go проверяет это после возврата p.Run()).
+// Пусто, если перезапуск не требуется.
+func (a App) RestartExe() string {
+	return a.main.RestartExe()
+}
+
 // afterAuthState — какой экран показать после того, как экран входа
 // (пройденный или пропущенный) закрывается: главный, если репозиторий открыт,
 // иначе экран "репозиторий не найден".

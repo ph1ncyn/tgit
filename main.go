@@ -9,6 +9,7 @@ import (
 	"tgit/internal/config"
 	"tgit/internal/gitrepo"
 	"tgit/internal/ui"
+	"tgit/internal/update"
 )
 
 // version подставляется при сборке через -ldflags "-X main.version=...";
@@ -38,8 +39,22 @@ func main() {
 	app := ui.NewApp(repo, wd)
 
 	p := tea.NewProgram(app, tea.WithAltScreen(), tea.WithMouseCellMotion())
-	if _, err := p.Run(); err != nil {
+	finalModel, err := p.Run()
+	if err != nil {
 		fmt.Fprintln(os.Stderr, "tgit:", err)
 		os.Exit(1)
+	}
+
+	// Обновление применяется, пока tgit ещё работает (git pull + go build +
+	// подмена файла), но перезапуск в новый бинарник откладывается до сюда —
+	// после p.Run() терминал уже гарантированно возвращён в обычный режим,
+	// так что новый процесс унаследует его чистым, без разрыва raw/alt-screen.
+	if fm, ok := finalModel.(ui.App); ok {
+		if exe := fm.RestartExe(); exe != "" {
+			if err := update.Restart(exe); err != nil {
+				fmt.Fprintln(os.Stderr, "tgit: restart after update failed:", err)
+				os.Exit(1)
+			}
+		}
 	}
 }

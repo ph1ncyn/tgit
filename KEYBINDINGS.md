@@ -101,6 +101,7 @@ Four panels: **Branches**, **Files**, **Log**, **Diff**. The active panel is hig
 | `p`       | push (uses the saved GitHub token for HTTPS repositories on github.com)                         |
 | `P`       | pull                                                                                             |
 | `f`       | fetch --all                                                                                       |
+| `u`       | update tgit (only when "update available" shows in the top bar) — git pull + rebuild + restart   |
 
 While an action is running (push/pull/checkout/commit/…), a spinner shows in the status line;
 new keyboard actions are ignored until the current one finishes.
@@ -186,5 +187,6 @@ S                 quick pop of the latest stash
 y                 copy commit hash (in Log)
 r                 refresh
 g                 GitHub sign-in
+u                 update tgit (when available)
 Ctrl+C            quit
 ```
