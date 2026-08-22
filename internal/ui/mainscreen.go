@@ -251,7 +251,11 @@ func (m mainModel) Update(msg tea.Msg) (mainModel, tea.Cmd) {
 			return m, autoFetchTickCmd() // пропускаем цикл, но таймер не глохнет
 		}
 		m.autoFetching = true
-		return m, tea.Batch(autoFetchCmd(m.repo, m.ghToken), autoFetchTickCmd())
+		cmds := []tea.Cmd{autoFetchCmd(m.repo, m.ghToken), autoFetchTickCmd()}
+		if m.localVersion != "" && !m.updateAvailable {
+			cmds = append(cmds, checkUpdateCmd())
+		}
+		return m, tea.Batch(cmds...)
 
 	case autoFetchResultMsg:
 		m.autoFetching = false
@@ -495,7 +499,11 @@ func (m mainModel) handleNormalKey(msg tea.KeyMsg) (mainModel, tea.Cmd) {
 		return m.moveCursor(1)
 	case "r":
 		m.status = ""
-		return m, m.loadCmd()
+		cmds := []tea.Cmd{m.loadCmd()}
+		if m.localVersion != "" {
+			cmds = append(cmds, checkUpdateCmd())
+		}
+		return m, tea.Batch(cmds...)
 	case " ":
 		return m.toggleStage()
 	case "enter":
