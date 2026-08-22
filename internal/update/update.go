@@ -165,19 +165,14 @@ func Apply(ctx context.Context, local Local) (newVersion, exe string, err error)
 	return v.Version, exe, nil
 }
 
-// Restart запускает свежеустановленный бинарник exe с теми же аргументами,
-// унаследовав текущий терминал, и возвращается — саму текущую программу не
-// трогает. Вызывающий код должен сам после этого корректно завершиться
-// (tea.Quit), чтобы bubbletea успел вернуть терминал в обычный режим,
-// прежде чем им начнёт пользоваться новый процесс. Прямой os.Exit() отсюда
-// был бы опасен: он оборвал бы процесс до того, как bubbletea восстановит
-// raw/alt-screen режим терминала, оставив терминал в сломанном состоянии.
+// Restart заменяет текущий процесс на свежеустановленный бинарник exe (см.
+// restart в restart_unix.go/restart_windows.go). При успехе не возвращается
+// вообще — процесс уже стал новой программой. Вызывающий код должен сам
+// корректно завершить bubbletea (tea.Quit) ДО вызова Restart, чтобы
+// терминал успел вернуться в обычный режим — иначе новый образ процесса
+// войдёт в raw mode поверх ещё не восстановленного состояния терминала.
 func Restart(exe string) error {
-	cmd := exec.Command(exe, os.Args[1:]...)
-	cmd.Stdin = os.Stdin
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-	return cmd.Start()
+	return restart(exe)
 }
 
 func runCmd(dir, name string, args ...string) (string, error) {
